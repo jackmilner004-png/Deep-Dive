@@ -112,6 +112,13 @@
   // A shuffled deck of prompt ids, kept across visits so prompts don't repeat
   // until the whole bank has been seen; then it reshuffles.
   let deck = load("deck", []).filter((id) => id < PROMPTS.length);
+  // Prompts added since this browser last played get mixed into the remaining deck.
+  const bankSize = load("bankSize", 88); // 88 = size of the first published bank
+  if (deck.length && bankSize < PROMPTS.length) {
+    deck = shuffle(deck.concat(PROMPTS.slice(bankSize).map((p) => p.id)));
+    save("deck", deck);
+  }
+  save("bankSize", PROMPTS.length);
   function drawPrompt() {
     if (!deck.length) deck = shuffle(PROMPTS.map((p) => p.id));
     const id = deck.shift();
