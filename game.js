@@ -2,7 +2,6 @@
   "use strict";
 
   const SECONDS = 25;
-  const PENALTY = 2;            // seconds lost for an answer that isn't on the list
   const DIVE_LENGTH = 7;
   const ENDLESS_TANKS = 3;      // endless mode ends after this many timeouts
   const METRES_PER_POINT = 10;
@@ -266,8 +265,7 @@
     if (!raw) return;
     const hit = match(game.prompt, raw);
     if (hit) return finishPrompt(hit);
-    game.timeLeft -= PENALTY;
-    el.feedback.textContent = `“${raw}” isn't on our list. −${PENALTY}s of air.`;
+    el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
@@ -717,7 +715,7 @@
 
   // Shared with multiplayer.js
   window.DeepDive = {
-    PROMPTS, TIERS, SECONDS, PENALTY, DIVE_LENGTH, METRES_PER_POINT,
+    PROMPTS, TIERS, SECONDS, DIVE_LENGTH, METRES_PER_POINT,
     match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
   };
 

@@ -7,8 +7,8 @@ answer, the deeper you sink.
 - Six rarity tiers: Plankton 10, Krill 25, Seahorse 40, Octopus 60,
   Anglerfish 85, Leviathan 100 (the single rarest answer for each prompt).
 - Every point is 10 metres of depth; a perfect 7-prompt dive reaches 7,000 m.
-- A wrong guess costs 2 seconds. In endless mode you play until you run out of
-  air three times.
+- Guess as many times as you like until the timer runs out. In endless mode you
+  play until you run out of air three times.
 - 277 categories and about 13,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
   so prompts don't repeat until you've seen them all (multiplayer rooms draw

@@ -62,7 +62,7 @@
   const profiles = {};                  // uid -> profile, for wins shown in the lobby
 
   function freshRound(r) {
-    return { round: r, diveId: null, answered: false, penalty: 0, revealSince: 0, descended: false };
+    return { round: r, diveId: null, answered: false, revealSince: 0, descended: false };
   }
 
   const esc = (s) => DD.escapeHtml(String(s ?? ""));
@@ -314,7 +314,7 @@
     if (!everyoneIn && now < closes + GRACE_MS) {
       if (!prompt) { if (!mine.answered) sendAnswer(null, ""); }
       if (!mine.answered) {
-        const left = Math.max(0, (closes - now) / 1000 - mine.penalty);
+        const left = Math.max(0, (closes - now) / 1000);
         showParts({ form: true, oxygen: true });
         el.oxygenFill.style.transform = `scaleX(${left / DD.SECONDS})`;
         el.oxygen.classList.toggle("low", left <= 7);
@@ -356,8 +356,7 @@
     if (!raw || !prompt) return;
     const hit = DD.match(prompt, raw);
     if (hit) return sendAnswer(hit, raw);
-    mine.penalty += DD.PENALTY;
-    el.feedback.textContent = `“${raw}” isn't on our list. −${DD.PENALTY}s of air.`;
+    el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
