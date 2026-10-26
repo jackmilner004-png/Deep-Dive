@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "players": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "dives": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "$other": { ".validate": false }
+      }
+    },
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 20" }
+          }
+        }
+      }
+    }
+  }
+}

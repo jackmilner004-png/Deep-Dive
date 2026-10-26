@@ -238,6 +238,51 @@ body.descending main { opacity: 0; pointer-events: none; }
   font: 500 12px var(--mono); color: var(--ink-faint); letter-spacing: .08em; text-transform: uppercase;
 }
 
+/* multiplayer */
+.mp-field { display: grid; gap: 8px; max-width: 420px; }
+.mp-field input, .mp-join input {
+  font: 400 19px var(--body); color: var(--ink); min-width: 0;
+  background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 12px; padding: 13px 16px;
+}
+.mp-field input:focus, .mp-join input:focus { outline: none; border-color: var(--lure); box-shadow: 0 0 0 3px rgba(127,245,214,.2); }
+.mp-choices { display: flex; flex-wrap: wrap; gap: 28px; align-items: end; }
+.mp-choice { display: grid; gap: 8px; margin: 0; }
+.mp-join { display: flex; gap: 10px; }
+.mp-join input { flex: 1; }
+#mp-code { max-width: 9ch; font-family: var(--mono); text-transform: uppercase; letter-spacing: .12em; }
+.room-code { margin: 4px 0 0; font: 800 clamp(56px, 12vw, 96px)/1 var(--mono); letter-spacing: .14em; color: var(--lure); }
+ul.players, ol.board, ol.answers, ul.answered { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+ul.players li, ol.board li {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+  padding: 10px 14px; background: var(--glass); border-radius: 4px;
+}
+ul.players li { grid-template-columns: minmax(0, 1fr) auto; }
+ul.players li.away { opacity: .5; }
+.who { font-weight: 700; overflow-wrap: anywhere; }
+.who em, .who .host { font: 500 11px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: .1em; color: var(--lure); margin-left: 6px; }
+.who .host { color: var(--t2); }
+.wins, .delta { font: 500 13px var(--mono); color: var(--ink-faint); }
+.delta { color: var(--lure); min-width: 5ch; text-align: right; }
+.rank { font: 700 15px var(--mono); color: var(--ink-faint); }
+.depth { font: 700 16px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+li.me { box-shadow: inset 3px 0 0 var(--lure); }
+ol.board.final li { grid-template-columns: 28px minmax(0, 1fr) auto auto; }
+ol.board.final li.winner { background: rgba(127,245,214,.12); }
+ol.board.final li.winner .rank { color: var(--lure); }
+.tiers { letter-spacing: 1px; font-size: 13px; }
+.countdown { margin: 0; font: 700 22px var(--mono); color: var(--lure); }
+.waiting ul.answered { display: flex; flex-wrap: wrap; gap: 8px; }
+ul.answered li { padding: 5px 11px; border-radius: 999px; border: 1px dashed var(--ink-faint); color: var(--ink-faint); font-size: 15px; }
+ul.answered li.in { border: 1px solid var(--lure); color: var(--lure); }
+ol.answers li {
+  display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr) auto 70px; gap: 12px; align-items: center;
+  padding: 10px 14px; background: rgba(255,255,255,.03); border-left: 3px solid var(--c); border-radius: 0 4px 4px 0;
+  animation: pop .45s cubic-bezier(.2,.9,.3,1.3) both; animation-delay: calc(var(--i) * 120ms);
+}
+@keyframes pop { from { transform: translateY(8px) scale(.96); opacity: 0; } }
+ol.answers .what { overflow-wrap: anywhere; }
+ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: right; }
+
 @media (max-width: 760px) {
   .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   aside.gauge { display: none; }
@@ -245,6 +290,12 @@ body.descending main { opacity: 0; pointer-events: none; }
   .log-prompt { grid-column: 1 / -1; }
   .log-m { display: none; }
   form.answer { flex-direction: column; }
+  ol.answers li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who gain" "what chip"; }
+  ol.answers .who { grid-area: who; } ol.answers .what { grid-area: what; }
+  ol.answers .chip { grid-area: chip; } ol.answers .gain { grid-area: gain; }
+  ol.board li .delta { display: none; }
+  ol.board li, ol.board.final li { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  ol.board.final .tiers { grid-column: 2; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::after { animation: none !important; transition: none !important; }
@@ -279,6 +330,7 @@ body.descending main { opacity: 0; pointer-events: none; }
       <div class="actions">
         <button class="primary" type="button" data-start="dive">Start a dive · 7 prompts</button>
         <button type="button" data-start="endless">Endless dive · 3 air tanks</button>
+        <button type="button" id="open-mp">Play with friends</button>
       </div>
       <p class="label" style="margin:0">25 seconds per prompt · a wrong guess costs 2 seconds · dive again as often as you like</p>
       <dl class="stats" id="stats"></dl>
@@ -323,6 +375,95 @@ body.descending main { opacity: 0; pointer-events: none; }
         <button class="link" type="button" data-menu>Menu</button>
       </div>
     </section>
+
+    <section class="screen" id="screen-mp" hidden>
+      <div>
+        <p class="label">Multiplayer</p>
+        <h2 class="category">Dive with friends</h2>
+      </div>
+      <p class="lede">Everyone in a room gets the same seven prompts. After each one, all the answers come up together and the leaderboard updates. The deepest diver at the end takes the win.</p>
+      <p class="feedback" id="mp-status" hidden></p>
+      <div class="mp-field">
+        <label class="label" for="mp-name">Your name</label>
+        <input id="mp-name" type="text" maxlength="20" placeholder="What should others see?" autocomplete="nickname">
+      </div>
+      <dl class="stats" id="mp-profile"></dl>
+      <div class="mp-choices">
+        <div class="mp-choice">
+          <p class="label">Start a new room</p>
+          <button class="primary" type="button" id="mp-create">Create a room</button>
+        </div>
+        <form class="mp-choice" id="mp-join-form" autocomplete="off">
+          <label class="label" for="mp-code">Join with a code</label>
+          <div class="mp-join">
+            <input id="mp-code" type="text" maxlength="5" placeholder="ABCDE" autocapitalize="characters" spellcheck="false">
+            <button type="submit">Join</button>
+          </div>
+        </form>
+      </div>
+      <p class="feedback miss" id="mp-home-error" aria-live="assertive"></p>
+      <div><button class="link" type="button" data-menu>Back to solo play</button></div>
+    </section>
+
+    <section class="screen" id="screen-lobby" hidden>
+      <div>
+        <p class="label">Room code</p>
+        <p class="room-code" id="lobby-code"></p>
+      </div>
+      <div class="share">
+        <label class="label" for="lobby-link">Invite link</label>
+        <div class="mp-join">
+          <input id="lobby-link" type="text" readonly>
+          <button type="button" id="lobby-copy">Copy link</button>
+        </div>
+        <span class="copied" id="lobby-copied" aria-live="polite"></span>
+      </div>
+      <div>
+        <p class="label">Divers in this room</p>
+        <ul class="players" id="lobby-players"></ul>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" id="lobby-start">Start the dive</button>
+        <p class="feedback" id="lobby-wait"></p>
+      </div>
+      <div><button class="link" type="button" data-leave>Leave room</button></div>
+    </section>
+
+    <section class="screen" id="screen-mp-play" hidden>
+      <div class="playhead">
+        <span class="label" id="mp-progress">Prompt 1 of 7</span>
+        <span class="label" id="mp-room-tag"></span>
+      </div>
+      <h2 class="category" id="mp-category"></h2>
+      <p class="countdown" id="mp-countdown" hidden></p>
+      <div class="oxygen" id="mp-oxygen" hidden>
+        <div class="bar"><div class="fill" id="mp-oxygen-fill"></div></div>
+        <span class="secs" id="mp-seconds">25</span>
+      </div>
+      <form class="answer" id="mp-answer-form" autocomplete="off" hidden>
+        <label for="mp-answer" class="label" hidden>Your answer</label>
+        <input id="mp-answer" type="text" placeholder="Type an answer and press Enter" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+        <button class="primary" type="submit">Dive</button>
+      </form>
+      <p class="feedback" id="mp-feedback" aria-live="assertive" hidden></p>
+      <div class="waiting" id="mp-waiting" hidden></div>
+      <div class="reveal mp-reveal" id="mp-reveal" hidden aria-live="polite"></div>
+      <div class="mp-board" id="mp-board"></div>
+      <div><button class="link" type="button" data-leave>Leave room</button></div>
+    </section>
+
+    <section class="screen" id="screen-mp-end" hidden>
+      <div>
+        <p class="label" id="mp-end-title">Dive complete</p>
+        <p class="end-zone" id="mp-end-winner"></p>
+      </div>
+      <ol class="board final" id="mp-end-board"></ol>
+      <div class="actions">
+        <button class="primary" type="button" id="mp-again">Dive again</button>
+        <p class="feedback" id="mp-end-wait"></p>
+      </div>
+      <div><button class="link" type="button" data-leave>Leave room</button></div>
+    </section>
   </main>
 
   <aside class="gauge" aria-hidden="true">
@@ -366,5 +507,8 @@ body.descending main { opacity: 0; pointer-events: none; }
 <script src="prompts.js"></script>
 <script src="prompts-specific.js"></script>
 <script src="game.js"></script>
+<script src="firebase-config.js"></script>
+<script src="net.js"></script>
+<script src="multiplayer.js"></script>
 </body>
 </html>

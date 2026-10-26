@@ -39,7 +39,9 @@
 
   function titleCase(s) {
     if (/^[a-z]{1,3}[\d+#-]/.test(s) || s.length <= 2) return s.toUpperCase();
-    return s.replace(/(^|[\s(-])([a-z])/g, (m, p, c) => p + c.toUpperCase());
+    const small = /^(a|an|and|at|by|for|in|of|on|or|the|to|with|de|da|von)$/;
+    return s.replace(/(^|[\s(-])([a-z][^\s(-]*)/g, (m, p, w, i) =>
+      p + (i > 0 && p === " " && small.test(w) ? w : w[0].toUpperCase() + w.slice(1)));
   }
 
   const PROMPTS = window.DEEP_DIVE_PROMPTS.map((line, id) => {
@@ -184,7 +186,7 @@
   }
 
   function show(screen) {
-    [el.start, el.play, el.end].forEach((s) => { s.hidden = s !== screen; });
+    document.querySelectorAll("main > .screen").forEach((s) => { s.hidden = s !== screen; });
     window.scrollTo({ top: 0 });
   }
 
@@ -335,7 +337,10 @@
     const from = game.shownDepth, to = game.depth;
     const last = game.log[game.log.length - 1];
     game.descending = true;
-    descend(from, to, last).then(() => {
+    const note = last.tier < 0
+      ? (game.mode === "endless" ? "Out of air · one tank used" : "Out of air · holding depth")
+      : `${TIERS[last.tier].name} · +${fmt(to - from)} m`;
+    descend(from, to, note, last.tier).then(() => {
       if (!game) return;
       game.descending = false;
       game.shownDepth = to;
@@ -344,10 +349,12 @@
     });
   }
 
-  function descend(from, to, last) {
+  // Plays the diver sinking from one depth to another; `note` captions it and
+  // `tier` (-1 for no answer) colours the caption. `maxMs` caps the length.
+  function descend(from, to, note, tier, maxMs) {
     if (reduceMotion) return Promise.resolve();
     const gain = to - from;
-    const duration = gain > 0 ? Math.min(1300 + gain * 1.5, 2900) : 1100;
+    const duration = Math.min(gain > 0 ? Math.min(1300 + gain * 1.5, 2900) : 1100, maxMs || Infinity);
     const ppm = gain > 0 ? Math.min(Math.max(520 / gain, 0.55), 3) : 1; // pixels per metre
     const ctx = scene.canvas.getContext("2d");
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -358,10 +365,8 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    scene.note.textContent = last.tier < 0
-      ? (game.mode === "endless" ? "Out of air · one tank used" : "Out of air · holding depth")
-      : `${TIERS[last.tier].name} · +${fmt(gain)} m`;
-    scene.note.className = "descent-note tier-" + (last.tier < 0 ? "out" : last.tier);
+    scene.note.textContent = note;
+    scene.note.className = "descent-note tier-" + (tier < 0 ? "out" : tier);
     scene.zone.textContent = "";
     scene.diver.classList.toggle("drifting", gain === 0);
     scene.root.hidden = false;
@@ -534,10 +539,17 @@
     b.addEventListener("click", () => {
       if (game) { game.answering = false; cancelAnimationFrame(rafId); }
       game = null;
+      document.dispatchEvent(new CustomEvent("deepdive:menu"));
       setDepth(0);
       renderStats();
       show(el.start);
     }));
+
+  // Shared with multiplayer.js
+  window.DeepDive = {
+    PROMPTS, TIERS, SECONDS, PENALTY, DIVE_LENGTH, METRES_PER_POINT,
+    match, shuffle, fmt, zoneFor, setDepth, show, descend, escapeHtml, load, save,
+  };
 
   renderStats();
   setDepth(0);
