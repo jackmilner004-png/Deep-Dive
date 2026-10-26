@@ -666,6 +666,7 @@
     if (endless) stats.bestEndless = Math.max(stats.bestEndless, game.depth);
     else stats.best = Math.max(stats.best, game.depth);
     save("stats", stats);
+    document.dispatchEvent(new CustomEvent("deepdive:stats"));
 
     el.endTitle.textContent = endless
       ? `Endless dive · ${game.log.length} prompts`
@@ -713,10 +714,12 @@
       show(el.start);
     }));
 
-  // Shared with multiplayer.js
+  // Shared with multiplayer.js and account.js
   window.DeepDive = {
     PROMPTS, TIERS, SECONDS, DIVE_LENGTH, METRES_PER_POINT,
     match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
+    getStats: () => Object.assign({}, stats),
+    setStats(next) { Object.assign(stats, next); save("stats", stats); renderStats(); },
   };
 
   renderStats();

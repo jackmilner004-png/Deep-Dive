@@ -121,7 +121,8 @@
     if (offProfile) offProfile();
     offProfile = net.on(`players/${uid}`, (p) => {
       profile = Object.assign({ name: "", wins: 0, dives: 0 }, p || {});
-      if (!el.name.value.trim()) el.name.value = profile.name || DD.load("mpName", "");
+      const acct = net.account && net.account();
+      if (!el.name.value.trim()) el.name.value = profile.name || DD.load("mpName", "") || ((acct && acct.name) || "").split(" ")[0].slice(0, NAME_MAX);
       renderProfile();
     });
     // Already in the linked room (e.g. after a reload): go straight back in.

@@ -20,15 +20,40 @@ window.DeepDiveNet = (function () {
     const auth = A.getAuth(app);
     const db = D.getDatabase(app);
     await auth.authStateReady();
-    // Anonymous sign-in gives each browser a lasting player id with no account.
-    const user = auth.currentUser || (await A.signInAnonymously(auth)).user;
+    // Anonymous sign-in gives each browser a lasting player id with no account;
+    // signing in with Google upgrades that same id (see signInWithGoogle).
+    if (!auth.currentUser) await A.signInAnonymously(auth);
     let offset = 0;
     D.onValue(D.ref(db, ".info/serverTimeOffset"), (s) => { offset = s.val() || 0; });
     const ref = (path) => D.ref(db, path);
 
     return {
       kind: "firebase",
-      ready: async () => user.uid,
+      ready: async () => auth.currentUser.uid,
+      account() {
+        const u = auth.currentUser;
+        return u && { uid: u.uid, anonymous: u.isAnonymous, name: u.displayName || "", email: u.email || "", photo: u.photoURL || "" };
+      },
+      // Links Google to the current anonymous player, keeping its id and progress.
+      // If that Google account already has a player, signs in to it instead and
+      // reports the anonymous id it came from, so its progress can be merged.
+      async signInWithGoogle() {
+        const provider = new A.GoogleAuthProvider();
+        const before = auth.currentUser;
+        try {
+          if (before && before.isAnonymous) await A.linkWithPopup(before, provider);
+          else await A.signInWithPopup(auth, provider);
+          return { switchedFrom: null };
+        } catch (e) {
+          if (e.code !== "auth/credential-already-in-use") throw e;
+          await A.signInWithCredential(auth, A.GoogleAuthProvider.credentialFromError(e));
+          return { switchedFrom: before && before.uid };
+        }
+      },
+      async signOut() {
+        await A.signOut(auth);
+        await A.signInAnonymously(auth);
+      },
       serverNow: () => Date.now() + offset,
       get: async (path) => (await D.get(ref(path))).val(),
       set: (path, value) => D.set(ref(path), value),

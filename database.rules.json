@@ -7,6 +7,9 @@
         "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
         "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "dives": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "solo": {
+          "$stat": { ".validate": "newData.isNumber() && newData.val() >= 0" }
+        },
         "$other": { ".validate": false }
       }
     },

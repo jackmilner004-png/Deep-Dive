@@ -53,6 +53,19 @@ Win counts unlock animated badges in the lobby and on your profile: Glow at 5
 wins, Embers at 10, Flame at 20, then each time wins double: Plasma at 40,
 Aurora at 80, Prism at 160 and Dark matter from 320.
 
+### Google sign-in (saving progress)
+
+Players can sign in with Google from the start screen or the multiplayer
+screen. Signing in upgrades the anonymous player this browser already has, so
+existing wins carry over; if the Google account already has progress elsewhere,
+this browser's wins and dives are added to it. Solo stats (dives, best depths,
+prompts answered) are saved to `players/<id>/solo` and merged across devices.
+To switch it on:
+
+1. **Authentication → Sign-in method → Add new provider → Google → Enable**,
+   choose a support email, **Save**.
+2. Republish `database.rules.json` (it allows the `solo` stats).
+
 To try multiplayer without Firebase, open the page with `?local=1` in two tabs
 of the same browser: each tab is a separate player.
 
@@ -62,6 +75,7 @@ of the same browser: each tab is a separate player.
 |--------------|---------|
 | `index.html` | Page markup and styles. |
 | `game.js`    | Game logic, answer matching and the descent animation. |
+| `account.js` | Google sign-in and syncing solo stats to the player's account. |
 | `multiplayer.js` | Rooms, shared prompts, answer reveal, leaderboard and win counting. |
 | `net.js` | Shared-state backends: Firebase, and a same-browser one for `?local=1`. |
 | `firebase-config.js` | Your Firebase web config (empty until multiplayer is set up). |

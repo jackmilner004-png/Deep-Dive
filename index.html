@@ -260,6 +260,18 @@ body.descending main { opacity: 0; pointer-events: none; }
   font: 500 12px var(--mono); color: var(--ink-faint); letter-spacing: .08em; text-transform: uppercase;
 }
 
+/* account */
+.account { display: grid; gap: 8px; max-width: 560px; padding: 14px 16px; border: 1px solid var(--glass-edge); border-radius: 14px; background: var(--glass); }
+.acct-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.acct-row img { width: 36px; height: 36px; border-radius: 50%; }
+.acct-text { display: grid; gap: 2px; flex: 1; min-width: 180px; }
+.acct-text b { font: 700 16px var(--display); }
+.acct-text span { color: var(--ink-soft); font-size: 14px; overflow-wrap: anywhere; }
+button.google { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #1f1f1f; border-color: #fff; padding: 11px 18px; }
+button.google:hover { background: #eef6f8; }
+button.google svg { width: 18px; height: 18px; }
+.acct-msg { margin: 0; color: var(--danger); font-size: 14px; }
+
 /* multiplayer */
 .modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 button.mode {
@@ -458,6 +470,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
       </div>
       <p class="label" style="margin:0">25 seconds per prompt · guess as many times as you like · dive again as often as you like</p>
       <dl class="stats" id="stats"></dl>
+      <div class="account" data-account hidden></div>
     </section>
 
     <section class="screen" id="screen-play" hidden>
@@ -507,6 +520,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
       </div>
       <p class="lede">Everyone in a room gets the same seven prompts. After each one, all the answers come up together and the leaderboard updates. The deepest diver at the end takes the win.</p>
       <p class="feedback" id="mp-status" hidden></p>
+      <div class="account" data-account hidden></div>
       <div class="mp-field">
         <label class="label" for="mp-name">Your name</label>
         <input id="mp-name" type="text" maxlength="20" placeholder="What should others see?" autocomplete="nickname">
@@ -648,5 +662,6 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
 <script src="firebase-config.js"></script>
 <script src="net.js"></script>
 <script src="multiplayer.js"></script>
+<script src="account.js"></script>
 </body>
 </html>
