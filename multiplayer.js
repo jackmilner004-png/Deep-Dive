@@ -396,7 +396,7 @@
           <span class="gain">+${DD.fmt(tier < 0 ? 0 : a.points * DD.METRES_PER_POINT)} m</span>
         </li>`;
       }).join("")}</ol>
-      ${rarest ? `<p class="deeper"><span class="label">Leviathan answer</span><span class="pill tier-5">${esc(rarest.label)}</span></p>` : ""}`;
+      ${rarest ? `<p class="deeper"><span class="label">Leviathan answer</span><span class="pill tier-5">${esc(rarest.label)}</span></p>${DD.factHtml(prompt.prompt)}` : ""}`;
   }
 
   function renderBoard(dive, r, revealed) {

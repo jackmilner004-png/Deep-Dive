@@ -158,6 +158,10 @@ form.answer input::placeholder { color: var(--ink-faint); }
 .deeper .label { flex-basis: 100%; }
 .pill { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--c); color: var(--c); font-size: 15px; }
 #next { justify-self: start; }
+.fact {
+  margin: -6px 0 0; max-width: 60ch; padding-left: 12px; border-left: 2px solid var(--t5);
+  color: var(--ink-soft); font-size: 15px; line-height: 1.5; text-wrap: pretty;
+}
 
 .tier-0 { --c: var(--t0); } .tier-1 { --c: var(--t1); } .tier-2 { --c: var(--t2); }
 .tier-3 { --c: var(--t3); } .tier-4 { --c: var(--t4); } .tier-5 { --c: var(--t5); }
@@ -527,6 +531,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
 <script src="prompts.js"></script>
 <script src="prompts-specific.js"></script>
 <script src="prompts-more.js"></script>
+<script src="facts.js"></script>
 <script src="game.js"></script>
 <script src="firebase-config.js"></script>
 <script src="net.js"></script>

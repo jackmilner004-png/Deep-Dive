@@ -313,7 +313,8 @@
       ${!hit || hit.tier < 5
         ? `<p class="deeper"><span class="label">Leviathan answer</span>
              <span class="pill tier-5">${escapeHtml(rarest.label)}</span></p>`
-        : `<p class="deeper"><span class="label">You found the rarest answer on the list.</span></p>`}`;
+        : `<p class="deeper"><span class="label">You found the rarest answer on the list.</span></p>`}
+      ${factHtml(p.prompt)}`;
     el.next.textContent = lastPrompt ? "Surface and see your dive" : "Next prompt";
     el.reveal.hidden = false;
     el.next.hidden = false;
@@ -648,6 +649,12 @@
     });
   }
 
+  // A short note about the prompt's Leviathan answer (facts.js), so players learn what it is.
+  function factHtml(prompt) {
+    const fact = (window.DEEP_DIVE_FACTS || {})[prompt];
+    return fact ? `<p class="fact">${escapeHtml(fact)}</p>` : "";
+  }
+
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -711,7 +718,7 @@
   // Shared with multiplayer.js
   window.DeepDive = {
     PROMPTS, TIERS, SECONDS, PENALTY, DIVE_LENGTH, METRES_PER_POINT,
-    match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, load, save,
+    match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
   };
 
   renderStats();
