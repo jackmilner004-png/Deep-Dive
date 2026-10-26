@@ -261,6 +261,16 @@ body.descending main { opacity: 0; pointer-events: none; }
 }
 
 /* multiplayer */
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+button.mode {
+  display: grid; gap: 4px; text-align: left; border-radius: 12px; padding: 14px 16px;
+  font: 400 14px/1.4 var(--body); color: var(--ink-soft);
+}
+button.mode b { font: 700 17px var(--display); color: var(--ink); }
+button.mode[aria-checked="true"] { border-color: var(--lure); background: rgba(127,245,214,.1); }
+button.mode:disabled { opacity: 1; cursor: default; }
+.modes.readonly { grid-template-columns: minmax(0, 1fr); }
+.modes.readonly .mode[aria-checked="false"] { display: none; }
 .mp-field { display: grid; gap: 8px; max-width: 420px; }
 .mp-field input, .mp-join input {
   font: 400 19px var(--body); color: var(--ink); min-width: 0;
@@ -313,6 +323,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
   .log-m { display: none; }
   form.answer { flex-direction: column; }
   .group-diver .tag b { max-width: 84px; }
+  .modes { grid-template-columns: minmax(0, 1fr); }
   ol.answers li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who gain" "what chip"; }
   ol.answers .who { grid-area: who; } ol.answers .what { grid-area: what; }
   ol.answers .chip { grid-area: chip; } ol.answers .gain { grid-area: gain; }
@@ -444,6 +455,17 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
       <div>
         <p class="label">Divers in this room</p>
         <ul class="players" id="lobby-players"></ul>
+      </div>
+      <div>
+        <p class="label">Game mode</p>
+        <div class="modes" id="lobby-modes" role="radiogroup" aria-label="Game mode">
+          <button type="button" class="mode" data-mode="classic" role="radio" aria-checked="true">
+            <b>Classic</b><span>Everyone answers every prompt. The rarer your answer, the deeper you dive.</span>
+          </button>
+          <button type="button" class="mode" data-mode="frenzy" role="radio" aria-checked="false">
+            <b>Feeding frenzy</b><span>The first right answer claims the round, and only they score. The question appears only when the timer starts.</span>
+          </button>
+        </div>
       </div>
       <div class="actions">
         <button class="primary" type="button" id="lobby-start">Start the dive</button>

@@ -34,6 +34,7 @@
     lobbyPlayers: $("#lobby-players"),
     startBtn: $("#lobby-start"),
     lobbyWait: $("#lobby-wait"),
+    modes: $("#lobby-modes"),
     progress: $("#mp-progress"),
     roomTag: $("#mp-room-tag"),
     category: $("#mp-category"),
@@ -62,7 +63,7 @@
   const profiles = {};                  // uid -> profile, for wins shown in the lobby
 
   function freshRound(r) {
-    return { round: r, diveId: null, answered: false, revealSince: 0, descended: false };
+    return { round: r, diveId: null, answered: false, claiming: false, revealSince: 0, descended: false };
   }
 
   const esc = (s) => DD.escapeHtml(String(s ?? ""));
@@ -219,12 +220,23 @@
     .sort((a, b) => (room.players[a].joinedAt || 0) - (room.players[b].joinedAt || 0));
   const activeIds = () => playerIds().filter((id) => room.players[id].online !== false);
 
+  // Feeding frenzy: the first right answer claims the round; nobody else scores.
+  const isFrenzy = (dive) => !!dive && dive.mode === "frenzy";
+
+  // Who scored what on round r, as { uid: answer }. In a frenzy only the claimer appears.
+  function answersFor(dive, r) {
+    if (isFrenzy(dive)) {
+      const c = dive.claims && dive.claims[r];
+      return c ? { [c.uid]: c } : {};
+    }
+    return (dive && dive.answers && dive.answers[r]) || {};
+  }
+
   function totals(dive, uptoRound) {
     const t = {};
     playerIds().forEach((id) => { t[id] = 0; });
-    const answers = (dive && dive.answers) || {};
     for (let r = 0; r <= uptoRound; r++) {
-      const a = answers[r] || {};
+      const a = answersFor(dive, r);
       Object.keys(a).forEach((id) => { t[id] = (t[id] || 0) + (a[id].points || 0) * DD.METRES_PER_POINT; });
     }
     return t;
@@ -240,7 +252,7 @@
 
   function renderLobby() {
     const ids = playerIds();
-    const key = JSON.stringify([code, room.players, room.host, ids.map((id) => profiles[id] && profiles[id].wins)]);
+    const key = JSON.stringify([code, room.players, room.host, room.mode, ids.map((id) => profiles[id] && profiles[id].wins)]);
     if (!el.lobby.hidden && el.lobby.dataset.key === key) return;
     el.lobby.dataset.key = key;
     DD.show(el.lobby);
@@ -255,6 +267,12 @@
       profiles[id] = { wins: 0 };
       profiles[id] = (await net.get(`players/${id}`)) || { wins: 0 };
     });
+    const mode = room.mode || "classic";
+    el.modes.classList.toggle("readonly", !isHost());
+    el.modes.querySelectorAll("[data-mode]").forEach((b) => {
+      b.setAttribute("aria-checked", String(b.dataset.mode === mode));
+      b.disabled = !isHost();
+    });
     el.startBtn.hidden = !isHost();
     el.lobbyWait.hidden = isHost();
     el.lobbyWait.textContent = `Waiting for ${nameOf(room.host)} to start the dive.`;
@@ -266,7 +284,7 @@
     const prompts = Array.from({ length: DD.DIVE_LENGTH }, () => DD.drawPrompt().prompt);
     const id = ((room.dive && room.dive.id) || 0) + 1;
     await net.set(`rooms/${code}/dive`, {
-      id, prompts,
+      id, prompts, mode: room.mode || "classic",
       state: { status: "playing", round: 0, startedAt: net.serverNow() },
     });
   }
@@ -283,27 +301,35 @@
     const prompt = byText.get(dive.prompts[r]);
     const opens = st.startedAt + LEAD_MS;
     const closes = opens + ROUND_MS;
+    const frenzy = isFrenzy(dive);
     const answers = (dive.answers && dive.answers[r]) || {};
-    const everyoneIn = activeIds().every((id) => answers[id]);
+    const claim = frenzy && dive.claims && dive.claims[r];
+    const everyoneIn = frenzy ? !!claim : activeIds().every((id) => answers[id]);
     const t = totals(dive, r - 1);
 
-    el.progress.textContent = `Prompt ${r + 1} of ${dive.prompts.length}`;
+    el.progress.textContent = `${frenzy ? "Feeding frenzy · " : ""}Prompt ${r + 1} of ${dive.prompts.length}`;
     el.roomTag.textContent = `Room ${code}`;
-    el.category.textContent = prompt ? prompt.prompt : dive.prompts[r];
+    // In a frenzy the question stays hidden until the answer box opens: no thinking time.
+    el.category.textContent = frenzy && now < opens ? "Get ready…" : (prompt ? prompt.prompt : dive.prompts[r]);
     renderBoard(dive, r, everyoneIn || now >= closes + GRACE_MS);
 
     // 1. lead-in: the diver sinks to the depth earned on the last prompt
     if (now < opens) {
       showParts({ countdown: true });
-      el.countdown.textContent = r === 0 ? `Get ready · ${Math.ceil((opens - now) / 1000)}` : "Next prompt coming up";
+      el.countdown.textContent = frenzy
+        ? `Question in ${Math.ceil((opens - now) / 1000)} · first right answer claims it`
+        : (r === 0 ? `Get ready · ${Math.ceil((opens - now) / 1000)}` : "Next prompt coming up");
       DD.setDepth(t[uid] || 0);
       if (r > 0 && !mine.descended) {
         mine.descended = true;
         const was = totals(dive, r - 2);
         const before = was[uid] || 0, after = t[uid] || 0;
-        const a = ((dive.answers && dive.answers[r - 1]) || {})[uid];
+        const a = answersFor(dive, r - 1)[uid];
         const tier = a && a.tier >= 0 ? a.tier : -1;
-        const note = tier >= 0 ? `${DD.TIERS[tier].name} · +${DD.fmt(after - before)} m` : "Out of air · holding depth";
+        const lastClaim = frenzy && dive.claims && dive.claims[r - 1];
+        const note = tier >= 0 ? `${DD.TIERS[tier].name} · +${DD.fmt(after - before)} m`
+          : frenzy ? (lastClaim ? `${nameOf(lastClaim.uid)} claimed it · holding depth` : "Nobody claimed it · holding depth")
+          : "Out of air · holding depth";
         const divers = playerIds().map((id) => ({ name: nameOf(id), from: was[id] || 0, to: t[id] || 0, me: id === uid }));
         DD.descendGroup(divers, note, tier, Math.max(opens - now - 450, 600));
       }
@@ -312,14 +338,14 @@
 
     // 2. the prompt is open
     if (!everyoneIn && now < closes + GRACE_MS) {
-      if (!prompt) { if (!mine.answered) sendAnswer(null, ""); }
-      if (!mine.answered) {
+      if (!prompt && !frenzy) { if (!mine.answered) sendAnswer(null, ""); }
+      if (frenzy || !mine.answered) {
         const left = Math.max(0, (closes - now) / 1000);
         showParts({ form: true, oxygen: true });
         el.oxygenFill.style.transform = `scaleX(${left / DD.SECONDS})`;
         el.oxygen.classList.toggle("low", left <= 7);
         el.seconds.textContent = Math.ceil(left);
-        if (left <= 0) sendAnswer(null, "");
+        if (left <= 0) { if (!frenzy) sendAnswer(null, ""); }
         else if (document.activeElement !== el.input && !el.input.disabled) el.input.focus();
       } else {
         showParts({ waiting: true });
@@ -334,7 +360,8 @@
     // 3. reveal everyone's answers, then move on
     if (!mine.revealSince) mine.revealSince = now;
     showParts({ reveal: true });
-    renderReveal(prompt, answers, r);
+    if (frenzy) renderFrenzyReveal(prompt, claim, r);
+    else renderReveal(prompt, answers, r);
     const waited = now - mine.revealSince;
     if ((isHost() && waited > REVEAL_MS) || waited > REVEAL_MS + 7000) advance(dive, r);
   }
@@ -354,7 +381,9 @@
     const dive = room.dive, prompt = byText.get(dive.prompts[dive.state.round]);
     const raw = el.input.value.trim();
     if (!raw || !prompt) return;
+    if (isFrenzy(dive) && net.serverNow() < dive.state.startedAt + LEAD_MS) return;
     const hit = DD.match(prompt, raw);
+    if (hit && isFrenzy(dive)) return claimRound(hit);
     if (hit) return sendAnswer(hit, raw);
     el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
@@ -375,6 +404,41 @@
       points: hit ? DD.TIERS[hit.tier].points : 0,
       at: net.serverNow(),
     });
+  }
+
+  // First valid answer wins: one atomic write, so two near-simultaneous answers
+  // can't both claim the round.
+  async function claimRound(hit) {
+    if (mine.claiming) return;
+    mine.claiming = true;
+    const r = mine.round;
+    el.input.disabled = true;
+    const res = await net.transaction(`rooms/${code}/dive/claims/${r}`, (cur) => (cur ? undefined : {
+      uid, answer: hit.label, tier: hit.tier, points: DD.TIERS[hit.tier].points, at: net.serverNow(),
+    }));
+    el.input.disabled = false;
+    mine.claiming = false;
+    if (!res.committed && res.value && res.value.uid !== uid && mine.round === r) {
+      el.feedback.textContent = `Too slow: ${nameOf(res.value.uid)} got there first.`;
+      el.feedback.className = "feedback miss";
+    }
+  }
+
+  function renderFrenzyReveal(prompt, claim, r) {
+    const key = JSON.stringify([r, claim]);
+    if (el.reveal.dataset.key === key) return;
+    el.reveal.dataset.key = key;
+    const rarest = prompt && prompt.byTier[5][0];
+    const tier = claim ? claim.tier : -1;
+    el.reveal.innerHTML = `
+      <p class="label">${claim ? (claim.uid === uid ? "You claimed this round" : "Round claimed") : "Nobody claimed this round"}</p>
+      ${claim ? `<ol class="answers"><li class="tier-${tier}${claim.uid === uid ? " me" : ""}" style="--i:0">
+          <span class="who">${esc(nameOf(claim.uid))}${claim.uid === uid ? " <em>you</em>" : ""}</span>
+          <span class="what">${esc(claim.answer)}</span>
+          <span class="chip">${DD.TIERS[tier].name}</span>
+          <span class="gain">+${DD.fmt(claim.points * DD.METRES_PER_POINT)} m</span>
+        </li></ol>` : ""}
+      ${rarest ? `<p class="deeper"><span class="label">Leviathan answer</span><span class="pill tier-5">${esc(rarest.label)}</span></p>${DD.factHtml(prompt.prompt)}` : ""}`;
   }
 
   function renderReveal(prompt, answers, r) {
@@ -431,7 +495,9 @@
   function renderEnd(dive) {
     const t = totals(dive, dive.prompts.length - 1);
     const ids = playerIds().sort((a, b) => t[b] - t[a]);
-    const answered = ids.filter((id) => Object.values(dive.answers || {}).some((a) => a && a[id]));
+    // In a frenzy everyone present took part, even without claiming a round.
+    const answered = isFrenzy(dive) ? ids
+      : ids.filter((id) => Object.values(dive.answers || {}).some((a) => a && a[id]));
     const best = Math.max(0, ...ids.map((id) => t[id]));
     const winners = best > 0 && answered.length >= 2 ? ids.filter((id) => t[id] === best) : [];
     const key = JSON.stringify([dive.id, t, winners, room.host, room.players]);
@@ -441,7 +507,7 @@
     DD.show(el.end);
     DD.setDepth(t[uid] || 0);
 
-    el.endTitle.textContent = `Room ${code} · dive complete`;
+    el.endTitle.textContent = `Room ${code} · ${isFrenzy(dive) ? "feeding frenzy" : "dive"} complete`;
     el.endWinner.textContent = !winners.length
       ? (answered.length < 2 ? "Wins count when two or more divers play." : "Nobody scored this time.")
       : winners.includes(uid)
@@ -452,7 +518,7 @@
         <span class="rank">${i + 1}</span>
         <span class="who">${esc(nameOf(id))}${id === uid ? " <em>you</em>" : ""}</span>
         <span class="tiers">${dive.prompts.map((_, r) => {
-          const a = ((dive.answers || {})[r] || {})[id];
+          const a = answersFor(dive, r)[id];
           return a && a.tier >= 0 ? DD.TIERS[a.tier].glyph : "⬛";
         }).join("")}</span>
         <span class="depth">${DD.fmt(t[id])} m</span>
@@ -488,6 +554,10 @@
   el.joinForm.addEventListener("submit", joinRoom);
   el.form.addEventListener("submit", submit);
   el.startBtn.addEventListener("click", startDive);
+  el.modes.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mode]");
+    if (b && isHost() && room) net.update(`rooms/${code}`, { mode: b.dataset.mode });
+  });
   el.again.addEventListener("click", startDive);
   el.name.addEventListener("change", () => { if (net && currentName()) saveName(); });
   el.copyLink.addEventListener("click", () => {

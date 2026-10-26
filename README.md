@@ -24,6 +24,13 @@ each prompt, every player's answer is revealed together and the leaderboard
 updates; the deepest diver at the end wins. Wins and multiplayer dives are kept
 on each player's profile (wins only count when two or more divers play).
 
+The host picks a mode in the lobby:
+
+- **Classic**: everyone answers every prompt; all answers are revealed together.
+- **Feeding frenzy**: the question stays hidden until the timer starts, and the
+  first right answer claims the round. Only that player scores, and rarer answers
+  still score more. Rounds nobody claims before the timer runs out score nothing.
+
 Multiplayer runs on Firebase (free Spark plan). Until `firebase-config.js` has a
 config, the button is hidden. To switch it on:
 
