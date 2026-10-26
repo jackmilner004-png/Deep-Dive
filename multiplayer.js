@@ -75,8 +75,11 @@
     DD.setDepth(0);
     DD.show(el.home);
     el.homeError.textContent = message || "";
+    const fromLink = (new URLSearchParams(location.search).get("room") || "").toUpperCase();
+    if (fromLink && !message) el.code.value = fromLink;
     el.status.textContent = "Connecting…";
     el.status.hidden = false;
+    setConnected(false);
     try { net = await DeepDiveNet.connect(); }
     catch (e) { net = null; el.status.textContent = "Couldn't reach the multiplayer server. Check your connection and try again."; return; }
     if (!net) {
@@ -85,18 +88,22 @@
     }
     uid = await net.ready();
     el.status.hidden = true;
+    setConnected(true);
     if (offProfile) offProfile();
     offProfile = net.on(`players/${uid}`, (p) => {
       profile = Object.assign({ name: "", wins: 0, dives: 0 }, p || {});
-      if (document.activeElement !== el.name) el.name.value = profile.name || DD.load("mpName", "");
+      if (!el.name.value.trim()) el.name.value = profile.name || DD.load("mpName", "");
       renderProfile();
     });
-    const fromLink = (new URLSearchParams(location.search).get("room") || "").toUpperCase();
-    if (fromLink && !message) {
-      el.code.value = fromLink;
-      // Already in that room (e.g. after a reload): go straight back in.
-      if (await net.get(`rooms/${fromLink}/players/${uid}/name`)) enterRoom(fromLink);
-    }
+    // Already in the linked room (e.g. after a reload): go straight back in.
+    if (fromLink && !message && await net.get(`rooms/${fromLink}/players/${uid}/name`)) enterRoom(fromLink);
+  }
+
+  // Create and Join stay disabled until the connection (and sign-in) is ready.
+  function setConnected(ok) {
+    const join = el.joinForm.querySelector("button");
+    el.create.disabled = join.disabled = !ok;
+    el.create.textContent = ok ? "Create a room" : "Connecting…";
   }
 
   function renderProfile() {
@@ -184,15 +191,20 @@
 
   async function leaveRoom() {
     if (net && code && room) {
-      const c = code, wasHost = room.host === uid;
-      const others = Object.keys(room.players || {}).filter((id) => id !== uid);
+      const c = code;
+      // One atomic change: drop this player, hand over host, close an empty room.
+      // (Returning null for an unknown value lets Firebase fetch it and retry.)
+      const leaving = net.transaction(`rooms/${c}`, (r) => {
+        if (!r) return r;
+        if (!r.players || !r.players[uid]) return undefined;
+        delete r.players[uid];
+        const others = Object.keys(r.players);
+        if (!others.length) return null;
+        if (r.host === uid) r.host = others[0];
+        return r;
+      });
       leaveRoomLocally();
-      if (!others.length) await net.set(`rooms/${c}`, null);
-      else {
-        const changes = { [`players/${uid}`]: null };
-        if (wasHost) changes.host = others[0];
-        await net.update(`rooms/${c}`, changes);
-      }
+      await leaving;
     }
     try {
       const p = new URLSearchParams(location.search); p.delete("room");
@@ -405,7 +417,8 @@
     if (now - lastAdvanceTry < 1000) return;
     lastAdvanceTry = now;
     await net.transaction(`rooms/${code}/dive/state`, (s) => {
-      if (!s || s.status !== "playing" || s.round !== r) return undefined;
+      if (!s) return s;
+      if (s.status !== "playing" || s.round !== r) return undefined;
       if (r + 1 >= dive.prompts.length) return Object.assign({}, s, { status: "done" });
       return Object.assign({}, s, { round: r + 1, startedAt: net.serverNow() });
     });

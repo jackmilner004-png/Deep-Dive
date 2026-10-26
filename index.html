@@ -107,6 +107,8 @@ button:hover { border-color: var(--lure); }
 button:active { transform: translateY(1px); }
 button.primary { background: var(--lure); color: var(--lure-ink); border-color: var(--lure); box-shadow: 0 0 28px rgba(127,245,214,.35); }
 button.primary:hover { background: #a6fbe5; }
+button:disabled { opacity: .55; cursor: default; }
+button.primary:disabled:hover { background: var(--lure); }
 button.link { background: none; border: none; padding: 8px 0; color: var(--ink-soft); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
 :focus-visible { outline: 3px solid var(--lure); outline-offset: 3px; }
 
