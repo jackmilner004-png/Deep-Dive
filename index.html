@@ -8,7 +8,7 @@
 <meta name="description" content="A category word game: name something, and the rarer your answer, the deeper you sink. Unlimited prompts.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 /* Layout: one play column over a sea that darkens with depth, a real-scale
    depth gauge (0 – 11,000 m, ocean zones marked) pinned beside it. */
@@ -25,9 +25,9 @@
   --sea-top: hsl(193 62% 30%);
   --sea-bottom: hsl(210 70% 16%);
   --t0: #a7c0cc; --t1: #ffa98a; --t2: #f6d36b; --t3: #f0809b; --t4: #6fe3ff; --t5: #c9a2ff;
-  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
-  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -68,7 +68,7 @@ header.top {
   grid-column: 1 / -1;
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
 }
-.brand { font: 800 22px/1 var(--display); letter-spacing: -0.01em; }
+.brand { font: 700 22px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
 .brand span { color: var(--lure); }
 .readout { font: 500 14px/1.2 var(--mono); color: var(--ink-soft); display: flex; gap: 14px; }
 .readout strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -78,8 +78,8 @@ main { min-width: 0; }
 @keyframes rise { from { transform: translateY(10px); opacity: .6; } }
 
 h1 {
-  font: 800 clamp(52px, 11vw, 104px)/0.92 var(--display);
-  letter-spacing: -0.035em; margin: 8px 0 0; text-wrap: balance;
+  font: 700 clamp(46px, 9.5vw, 92px)/0.98 var(--display);
+  letter-spacing: -0.02em; text-transform: uppercase; margin: 8px 0 0; text-wrap: balance;
 }
 h1 em { font-style: normal; color: var(--lure); }
 .lede { font-size: 20px; color: var(--ink-soft); max-width: 34ch; margin: 0; }
@@ -120,7 +120,7 @@ dl.stats dd { margin: 4px 0 0; font: 700 22px var(--mono); font-variant-numeric:
 .tank { width: 12px; height: 22px; border-radius: 6px; background: var(--lure); box-shadow: 0 0 10px rgba(127,245,214,.5); }
 .tank.empty { background: transparent; border: 1px solid var(--ink-faint); box-shadow: none; }
 .category {
-  font: 800 clamp(36px, 7vw, 64px)/1.02 var(--display); letter-spacing: -0.025em;
+  font: 700 clamp(34px, 6.5vw, 60px)/1.05 var(--display); letter-spacing: -0.01em;
   margin: 0; text-wrap: balance; min-height: 1em;
 }
 .oxygen { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; }
@@ -144,7 +144,7 @@ form.answer input::placeholder { color: var(--ink-faint); }
 
 .reveal { display: grid; gap: 16px; padding: 22px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; }
 .verdict { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 24px; }
-.verdict strong { font: 800 28px/1.1 var(--display); }
+.verdict strong { font: 700 28px/1.1 var(--display); }
 .verdict .gain { font: 700 18px var(--mono); color: var(--c, var(--ink-soft)); }
 .verdict .lost { font: 700 14px var(--mono); color: var(--danger); }
 .chip {
@@ -162,7 +162,7 @@ form.answer input::placeholder { color: var(--ink-faint); }
 .tier-out { --c: var(--danger); }
 
 /* end */
-.end-depth { font: 800 clamp(64px, 14vw, 120px)/0.9 var(--display); letter-spacing: -0.04em; margin: 0; font-variant-numeric: tabular-nums; }
+.end-depth { font: 700 clamp(60px, 13vw, 112px)/1 var(--display); letter-spacing: -0.02em; margin: 0; font-variant-numeric: tabular-nums; }
 .end-zone { margin: 6px 0 0; font: 500 16px var(--mono); color: var(--lure); }
 ol.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 ol.log li {
@@ -226,7 +226,7 @@ body.descending main { opacity: 0; pointer-events: none; }
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 #descent-depth {
-  font: 800 clamp(48px, 10vw, 84px)/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  font: 700 clamp(46px, 9.5vw, 80px)/1 var(--display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums;
   text-shadow: 0 0 30px rgba(0,0,0,.5);
 }
 .descent-note { font: 700 14px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--c, var(--ink-soft)); }
