@@ -215,11 +215,27 @@ body.descending main { opacity: 0; pointer-events: none; }
   background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(127,245,214,.22), transparent 70%);
   clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
 }
-#diver { width: 70px; height: 140px; overflow: visible; animation: bob 1.6s ease-in-out infinite; }
-#diver .fin-l { transform-origin: 27px 34px; animation: kick .5s ease-in-out infinite alternate; }
-#diver .fin-r { transform-origin: 43px 34px; animation: kick .5s ease-in-out infinite alternate-reverse; }
-#diver.drifting { animation-duration: 3s; }
-#diver.drifting .fin-l, #diver.drifting .fin-r { animation-duration: 1.4s; }
+.diver { width: 70px; height: 140px; overflow: visible; animation: bob 1.6s ease-in-out infinite; }
+.diver .fin-l { transform-origin: 27px 34px; animation: kick .5s ease-in-out infinite alternate; }
+.diver .fin-r { transform-origin: 43px 34px; animation: kick .5s ease-in-out infinite alternate-reverse; }
+.diver.drifting { animation-duration: 3s; }
+.diver.drifting .fin-l, .diver.drifting .fin-r { animation-duration: 1.4s; }
+/* group descent (multiplayer): divers placed by script, head at their depth */
+.descent-group { position: absolute; inset: 0; pointer-events: none; }
+.group-diver { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.group-diver .diver { position: absolute; left: -24px; top: -98px; width: 48px; height: 96px; }
+.group-diver .tag {
+  position: absolute; left: 0; top: 8px; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 1px; white-space: nowrap;
+  font: 500 12px/1.2 var(--mono); color: var(--ink-soft); text-shadow: 0 1px 6px rgba(0,0,0,.6);
+}
+.group-diver .tag b { font: 700 13px var(--body); color: var(--ink); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.group-diver.me .tag b { color: var(--lure); }
+.group-diver:not(.me) .diver { opacity: .8; }
+.group-diver:not(.me) .diver rect[fill="#7ff5d6"] { fill: #f6d36b; }
+.descent.group-mode .stage { display: none; }
+.descent.group-mode .descent-readout { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 56px); }
+.descent.group-mode #descent-depth { font-size: clamp(38px, 7vw, 60px); }
 @keyframes kick { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 @keyframes bob { 50% { transform: translateX(3px) rotate(2deg); } }
 .descent-readout {
@@ -292,6 +308,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
   .log-prompt { grid-column: 1 / -1; }
   .log-m { display: none; }
   form.answer { flex-direction: column; }
+  .group-diver .tag b { max-width: 84px; }
   ol.answers li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who gain" "what chip"; }
   ol.answers .who { grid-area: who; } ol.answers .what { grid-area: what; }
   ol.answers .chip { grid-area: chip; } ol.answers .gain { grid-area: gain; }
@@ -484,7 +501,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
   <div class="stage" aria-hidden="true">
     <div class="beam"></div>
     <!-- head-down diver: fins at the top, mask and regulator at the bottom -->
-    <svg id="diver" viewBox="0 0 70 140">
+    <svg id="diver" class="diver" viewBox="0 0 70 140">
       <polygon class="fin-l" points="22,34 32,34 30,2 12,6" fill="#f6d36b"/>
       <polygon class="fin-r" points="38,34 48,34 58,6 40,2" fill="#f6d36b"/>
       <rect x="22" y="28" width="11" height="44" rx="5.5" fill="#24485a"/>
@@ -499,6 +516,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
       <circle cx="40" cy="132" r="3.5" fill="#16303d"/>
     </svg>
   </div>
+  <div class="descent-group" id="descent-group" aria-hidden="true"></div>
   <div class="descent-readout">
     <div id="descent-depth">0 m</div>
     <div class="descent-note" id="descent-note"></div>
@@ -508,6 +526,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
 </div>
 <script src="prompts.js"></script>
 <script src="prompts-specific.js"></script>
+<script src="prompts-more.js"></script>
 <script src="game.js"></script>
 <script src="firebase-config.js"></script>
 <script src="net.js"></script>

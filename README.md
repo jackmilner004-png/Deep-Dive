@@ -9,9 +9,10 @@ answer, the deeper you sink.
 - Every point is 10 metres of depth; a perfect 7-prompt dive reaches 7,000 m.
 - A wrong guess costs 2 seconds. In endless mode you play until you run out of
   air three times.
-- 155 categories and about 7,300 answers, from broad ("Name a fruit") to
+- 277 categories and about 13,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
-  so prompts don't repeat until you've seen them all.
+  so prompts don't repeat until you've seen them all (multiplayer rooms draw
+  from the host's shuffled order too).
 
 A static site — plain HTML, CSS and JavaScript, no build step.
 
@@ -54,6 +55,7 @@ of the same browser: each tab is a separate player.
 | `net.js` | Shared-state backends: Firebase, and a same-browser one for `?local=1`. |
 | `firebase-config.js` | Your Firebase web config (empty until multiplayer is set up). |
 | `database.rules.json` | Firebase Realtime Database security rules. |
+| `prompts-more.js` | Third batch of prompts (nature, places, people, entertainment, food, everyday, sport, words), same format. |
 | `prompts-specific.js` | More specific prompts (songs, films, books, sport, places, history), same format as `prompts.js`. |
 | `prompts.js` | The prompt bank. Each line is `Prompt \| plankton \| krill \| seahorse \| octopus \| anglerfish \| leviathan`; answers are comma separated, alternative spellings joined with `/`. |
 

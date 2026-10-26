@@ -5,7 +5,7 @@
   "use strict";
 
   const DD = window.DeepDive;
-  const LEAD_MS = 3200;                 // lead-in before each prompt (the descent plays here)
+  const LEAD_MS = 4200;                 // lead-in before each prompt (the descent plays here)
   const ROUND_MS = DD.SECONDS * 1000;
   const GRACE_MS = 1500;                // allowance for answers still in flight
   const REVEAL_MS = 8000;               // how long everyone's answers stay up
@@ -262,7 +262,8 @@
 
   async function startDive() {
     if (!isHost()) return;
-    const prompts = DD.shuffle(DD.PROMPTS.slice()).slice(0, DD.DIVE_LENGTH).map((p) => p.prompt);
+    // The host's own shuffled deck, so prompts don't repeat until the bank runs out.
+    const prompts = Array.from({ length: DD.DIVE_LENGTH }, () => DD.drawPrompt().prompt);
     const id = ((room.dive && room.dive.id) || 0) + 1;
     await net.set(`rooms/${code}/dive`, {
       id, prompts,
@@ -298,11 +299,13 @@
       DD.setDepth(t[uid] || 0);
       if (r > 0 && !mine.descended) {
         mine.descended = true;
-        const before = totals(dive, r - 2)[uid] || 0, after = t[uid] || 0;
+        const was = totals(dive, r - 2);
+        const before = was[uid] || 0, after = t[uid] || 0;
         const a = ((dive.answers && dive.answers[r - 1]) || {})[uid];
         const tier = a && a.tier >= 0 ? a.tier : -1;
         const note = tier >= 0 ? `${DD.TIERS[tier].name} · +${DD.fmt(after - before)} m` : "Out of air · holding depth";
-        DD.descend(before, after, note, tier, Math.max(opens - now - 400, 600));
+        const divers = playerIds().map((id) => ({ name: nameOf(id), from: was[id] || 0, to: t[id] || 0, me: id === uid }));
+        DD.descendGroup(divers, note, tier, Math.max(opens - now - 450, 600));
       }
       return;
     }

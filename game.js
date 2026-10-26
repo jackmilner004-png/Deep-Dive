@@ -330,6 +330,7 @@
     depth: $("#descent-depth"),
     note: $("#descent-note"),
     zone: $("#descent-zone"),
+    group: $("#descent-group"),
   };
 
   function advance() {
@@ -485,6 +486,168 @@
     });
   }
 
+  // Multiplayer version: every diver sinks from their old depth to their new one,
+  // side by side, and the camera zooms so all of them stay in view.
+  // divers: [{ name, from, to, me }]; `note`/`tier` caption this player's result.
+  function descendGroup(divers, note, tier, maxMs) {
+    if (reduceMotion || !divers.length) return Promise.resolve();
+    const me = divers.find((d) => d.me) || divers[0];
+    const biggest = Math.max(...divers.map((d) => d.to - d.from), 0);
+    const duration = Math.min(biggest > 0 ? Math.min(1500 + biggest * 1.5, 3200) : 1100, maxMs || Infinity);
+    const ctx = scene.canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W, H;
+    function size() {
+      W = scene.canvas.clientWidth; H = scene.canvas.clientHeight;
+      scene.canvas.width = W * dpr; scene.canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    // one cloned diver per player, each with a name tag
+    scene.group.innerHTML = "";
+    const figs = divers.map((d) => {
+      const fig = document.createElement("div");
+      fig.className = "group-diver" + (d.me ? " me" : "");
+      const svg = scene.diver.cloneNode(true);
+      svg.removeAttribute("id");
+      svg.classList.toggle("drifting", d.to === d.from);
+      const tag = document.createElement("div");
+      tag.className = "tag";
+      const nm = document.createElement("b");
+      nm.textContent = d.name + (d.me ? " (you)" : "");
+      const dp = document.createElement("span");
+      tag.append(nm, dp);
+      fig.append(svg, tag);
+      scene.group.append(fig);
+      return { fig, dp };
+    });
+
+    scene.note.textContent = note;
+    scene.note.className = "descent-note tier-" + (tier < 0 ? "out" : tier);
+    scene.zone.textContent = "";
+    scene.root.classList.add("group-mode");
+    scene.root.hidden = false;
+    document.body.classList.add("descending");
+    size();
+
+    const snow = Array.from({ length: 70 }, () => ({
+      x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.6 + 0.4,
+      depth: Math.random() * 0.8 + 0.4, drift: Math.random() * 2 - 1,
+    }));
+    const bubbles = [];
+    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    let zoneName = zoneFor(me.from);
+
+    return new Promise((resolve) => {
+      let start = 0, prev = 0, prevMid = null, done = false, raf = 0;
+      function finish() {
+        if (done) return;
+        done = true;
+        cancelAnimationFrame(raf);
+        window.removeEventListener("keydown", skip);
+        scene.root.removeEventListener("click", skip);
+        window.removeEventListener("resize", size);
+        scene.root.classList.add("leaving");
+        setTimeout(() => {
+          scene.root.hidden = true;
+          scene.root.classList.remove("leaving", "group-mode");
+          scene.group.innerHTML = "";
+          document.body.classList.remove("descending");
+          resolve();
+        }, 260);
+      }
+      function skip(e) {
+        if (e.type === "keydown" && !["Enter", " ", "Escape"].includes(e.key)) return;
+        if (e.type === "keydown") e.preventDefault();
+        setDepth(me.to);
+        finish();
+      }
+      setTimeout(() => {
+        if (done) return;
+        window.addEventListener("keydown", skip);
+        scene.root.addEventListener("click", skip);
+      }, 150);
+      window.addEventListener("resize", size);
+
+      function frame(now) {
+        if (!start) start = prev = now;
+        const dt = Math.min((now - prev) / 1000, 0.05);
+        prev = now;
+        const t = Math.min((now - start) / duration, 1);
+        const depths = divers.map((d) => d.from + (d.to - d.from) * ease(t));
+
+        // Fit every diver into the band between the header and the readout.
+        const lo = Math.min(...depths), hi = Math.max(...depths);
+        const bandTop = Math.max(90, H * 0.12) + 70, bandBottom = H - 230;
+        const ppm = Math.min(3, Math.max(bandBottom - bandTop, 60) / Math.max(hi - lo, 1));
+        const mid = (lo + hi) / 2, cy = (bandTop + bandBottom) / 2;
+        const yOf = (d) => cy + (d - mid) * ppm;
+        const speed = prevMid === null ? 0 : ((mid - prevMid) * ppm) / Math.max(dt, 0.001);
+        prevMid = mid;
+
+        const mine = depths[divers.indexOf(me)];
+        setDepth(Math.round(mine));
+        scene.depth.textContent = fmt(Math.round(mine)) + " m";
+        const z = zoneFor(mine);
+        if (z !== zoneName) {
+          zoneName = z;
+          scene.zone.textContent = z.startsWith("Below") ? z : "Entering the " + z.replace(/ zone$/, "") + " zone";
+          scene.zone.classList.remove("flash"); void scene.zone.offsetWidth; scene.zone.classList.add("flash");
+        }
+
+        ctx.clearRect(0, 0, W, H);
+        // depth lines, spaced so labels never crowd at any zoom
+        const step = [50, 100, 250, 500, 1000, 2000, 5000].find((s) => s * ppm >= 46) || 10000;
+        ctx.font = "500 12px " + getComputedStyle(document.body).getPropertyValue("--mono");
+        const top = mid - cy / ppm, bottom = mid + (H - cy) / ppm;
+        for (let d = Math.max(0, Math.floor(top / step) * step); d <= bottom; d += step) {
+          const y = yOf(d);
+          ctx.strokeStyle = "rgba(169,198,205,.22)";
+          ctx.beginPath(); ctx.moveTo(16, y); ctx.lineTo(W - 16, y); ctx.stroke();
+          ctx.fillStyle = "rgba(169,198,205,.6)";
+          ctx.fillText(fmt(d) + " m", 18, y - 6);
+        }
+
+        snow.forEach((s) => {
+          s.y -= (speed * s.depth + 6) * dt;
+          s.x += s.drift * 8 * dt;
+          if (s.y < -4) { s.y = H + 4; s.x = Math.random() * W; }
+          if (s.y > H + 4) { s.y = -4; s.x = Math.random() * W; }
+          if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+          ctx.fillStyle = `rgba(230,246,248,${0.15 + s.depth * 0.3})`;
+          ctx.beginPath();
+          const stretch = Math.min(Math.abs(speed) * s.depth * 0.02, 10);
+          ctx.ellipse(s.x, s.y, s.r, s.r + stretch, 0, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // place each diver: spread across the width, head at their depth
+        const gap = Math.min(W / (divers.length + 1), 170);
+        const x0 = W / 2 - (gap * (divers.length - 1)) / 2;
+        divers.forEach((d, i) => {
+          const x = x0 + gap * i, y = yOf(depths[i]);
+          figs[i].fig.style.transform = `translate(${x}px, ${y}px)`;
+          figs[i].dp.textContent = fmt(Math.round(depths[i])) + " m";
+          if (Math.random() < 0.18) bubbles.push({ x: x + 4 + Math.random() * 6, y: y - 8, r: Math.random() * 2.5 + 1.2, wob: Math.random() * 6 });
+        });
+
+        for (let i = bubbles.length - 1; i >= 0; i--) {
+          const b = bubbles[i];
+          b.y -= (70 + speed) * dt;
+          b.wob += dt * 6;
+          if (b.y < -10 || b.y > H + 10) { bubbles.splice(i, 1); continue; }
+          ctx.strokeStyle = "rgba(200,245,255,.5)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(b.x + Math.sin(b.wob) * 3, b.y, b.r, 0, Math.PI * 2); ctx.stroke();
+        }
+
+        if (t < 1) raf = requestAnimationFrame(frame);
+        else setTimeout(finish, 450);
+      }
+      raf = requestAnimationFrame(frame);
+    });
+  }
+
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -548,7 +711,7 @@
   // Shared with multiplayer.js
   window.DeepDive = {
     PROMPTS, TIERS, SECONDS, PENALTY, DIVE_LENGTH, METRES_PER_POINT,
-    match, shuffle, fmt, zoneFor, setDepth, show, descend, escapeHtml, load, save,
+    match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, load, save,
   };
 
   renderStats();
