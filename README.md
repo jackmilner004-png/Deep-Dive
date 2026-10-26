@@ -9,7 +9,7 @@ answer, the deeper you sink.
 - Every point is 10 metres of depth; a perfect 7-prompt dive reaches 7,000 m.
 - Guess as many times as you like until the timer runs out. In endless mode you
   play until you run out of air three times.
-- 277 categories and about 13,000 answers, from broad ("Name a fruit") to
+- 427 categories and about 20,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
   so prompts don't repeat until you've seen them all (multiplayer rooms draw
   from the host's shuffled order too).
@@ -91,6 +91,7 @@ of the same browser: each tab is a separate player.
 | `firebase-config.js` | Your Firebase web config (empty until multiplayer is set up). |
 | `database.rules.json` | Firebase Realtime Database security rules. |
 | `facts.js` | A short note on each prompt's Leviathan answer, shown after the reveal. Add one when you add a prompt. |
+| `prompts-extra.js` | Fourth batch: 25 categories built from Wikidata lists plus 125 written by hand. |
 | `prompts-more.js` | Third batch of prompts (nature, places, people, entertainment, food, everyday, sport, words), same format. |
 | `prompts-specific.js` | More specific prompts (songs, films, books, sport, places, history), same format as `prompts.js`. |
 | `prompts.js` | The prompt bank. Each line is `Prompt \| plankton \| krill \| seahorse \| octopus \| anglerfish \| leviathan`; answers are comma separated, alternative spellings joined with `/`. |
