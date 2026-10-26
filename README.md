@@ -53,6 +53,16 @@ Win counts unlock animated badges in the lobby and on your profile: Glow at 5
 wins, Embers at 10, Flame at 20, then each time wins double: Plasma at 40,
 Aurora at 80, Prism at 160 and Dark matter from 320.
 
+### Diver profiles
+
+Every multiplayer dive records per-mode stats on the player (`players/<id>/stats`
+and the last 30 dives in `players/<id>/history`). Open your own profile from the
+multiplayer screen, or anyone's by tapping their name in the lobby or on the
+end-of-dive leaderboard. It shows games, wins, win rate, answers, average points
+per answer, miss rate, Leviathans found, answer speed, best and average depth,
+average finishing place, answers by rarity, recent dives, and Classic vs
+Feeding frenzy side by side.
+
 ### Google sign-in (saving progress)
 
 Players can sign in with Google from the start screen or the multiplayer

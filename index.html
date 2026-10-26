@@ -272,6 +272,43 @@ button.google:hover { background: #eef6f8; }
 button.google svg { width: 18px; height: 18px; }
 .acct-msg { margin: 0; color: var(--danger); font-size: 14px; }
 
+/* profile */
+.prof-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--glass-edge); border-radius: 999px; background: var(--glass); justify-self: start; flex-wrap: wrap; }
+.seg button { padding: 9px 16px; border: none; background: none; font-size: 14px; color: var(--ink-soft); }
+.seg button[aria-selected="true"] { background: var(--lure); color: var(--lure-ink); }
+dl.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; }
+dl.tiles > div { padding: 12px 14px; background: var(--glass); border-radius: 10px; display: grid; gap: 4px; align-content: start; }
+dl.tiles dt { font: 700 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-faint); }
+dl.tiles dd { margin: 0; font: 700 24px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+dl.tiles dd small { display: block; font: 400 12px var(--body); color: var(--ink-faint); margin-top: 2px; }
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+figure.panel { margin: 0; padding: 16px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; display: grid; gap: 12px; min-width: 0; }
+.rar { display: grid; gap: 6px; }
+.rar-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 76px; gap: 10px; align-items: center; font-size: 14px; }
+.rar-row .nm { color: var(--ink-soft); }
+.rar-track { height: 14px; border-radius: 0 4px 4px 0; background: rgba(255,255,255,.05); }
+.rar-fill { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.rar-row .val { font: 500 13px var(--mono); text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rar-row .val span { color: var(--ink-faint); }
+.recent svg { width: 100%; height: auto; display: block; overflow: visible; }
+.recent text { font: 500 11px var(--mono); fill: var(--ink-faint); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.legend i.dot { border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sea-bottom); }
+.table-wrap { overflow-x: auto; }
+table.compare { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.compare th, table.compare td { padding: 8px 10px; text-align: right; border-bottom: 1px solid rgba(255,255,255,.06); font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.compare th:first-child, table.compare td:first-child { text-align: left; color: var(--ink-soft); font-family: var(--body); white-space: normal; }
+table.compare thead th { font: 700 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-faint); }
+table.compare td { font-family: var(--mono); color: var(--ink); }
+table.compare td:first-child { font-family: var(--body); }
+.chart-tip { position: fixed; z-index: 20; pointer-events: none; padding: 8px 10px; border-radius: 8px; background: #061520; border: 1px solid var(--glass-edge); font-size: 13px; color: var(--ink); box-shadow: 0 6px 20px rgba(0,0,0,.4); max-width: 220px; }
+.chart-tip b { display: block; font-family: var(--display); }
+button.who-link { all: unset; cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+button.who-link:hover b, button.who-link:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
+button.who-link:focus-visible { outline: 3px solid var(--lure); outline-offset: 2px; border-radius: 4px; }
+
 /* multiplayer */
 .modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 button.mode {
@@ -426,6 +463,10 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
   form.answer { flex-direction: column; }
   .group-diver .tag b { max-width: 84px; }
   .modes { grid-template-columns: minmax(0, 1fr); }
+  .charts { grid-template-columns: minmax(0, 1fr); }
+  .rar-row { grid-template-columns: 78px minmax(0, 1fr) 70px; }
+  table.compare { font-size: 13px; }
+  table.compare th, table.compare td { padding: 7px 6px; }
   ol.answers li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who gain" "what chip"; }
   ol.answers .who { grid-area: who; } ol.answers .what { grid-area: what; }
   ol.answers .chip { grid-area: chip; } ol.answers .gain { grid-area: gain; }
@@ -526,6 +567,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         <input id="mp-name" type="text" maxlength="20" placeholder="What should others see?" autocomplete="nickname">
       </div>
       <dl class="stats" id="mp-profile"></dl>
+      <div><button type="button" id="mp-view-profile">View your profile and stats</button></div>
       <div class="mp-choices">
         <div class="mp-choice">
           <p class="label">Start a new room</p>
@@ -599,6 +641,39 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
       <div class="reveal mp-reveal" id="mp-reveal" hidden aria-live="polite"></div>
       <div class="mp-board" id="mp-board"></div>
       <div><button class="link" type="button" data-leave>Leave room</button></div>
+    </section>
+
+    <section class="screen" id="screen-profile" hidden>
+      <div class="prof-head">
+        <div>
+          <p class="label">Diver profile · multiplayer</p>
+          <h2 class="category" id="prof-name"></h2>
+        </div>
+        <div id="prof-badge"></div>
+      </div>
+      <div class="seg" id="prof-modes" role="tablist" aria-label="Game mode">
+        <button type="button" role="tab" data-pmode="all" aria-selected="true">All</button>
+        <button type="button" role="tab" data-pmode="classic" aria-selected="false">Classic</button>
+        <button type="button" role="tab" data-pmode="frenzy" aria-selected="false">Feeding frenzy</button>
+      </div>
+      <p class="feedback" id="prof-empty" hidden></p>
+      <dl class="tiles" id="prof-tiles"></dl>
+      <div class="charts">
+        <figure class="panel">
+          <figcaption class="label">Answers by rarity</figcaption>
+          <div id="prof-rarity"></div>
+        </figure>
+        <figure class="panel">
+          <figcaption class="label">Recent dives · depth reached</figcaption>
+          <div id="prof-recent"></div>
+        </figure>
+      </div>
+      <figure class="panel">
+        <figcaption class="label">Classic vs feeding frenzy</figcaption>
+        <div class="table-wrap"><table class="compare" id="prof-compare"></table></div>
+      </figure>
+      <div><button class="link" type="button" id="prof-back">Back</button></div>
+      <div class="chart-tip" id="prof-tip" hidden></div>
     </section>
 
     <section class="screen" id="screen-mp-end" hidden>

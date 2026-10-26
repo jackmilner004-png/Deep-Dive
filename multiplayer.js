@@ -35,6 +35,16 @@
     startBtn: $("#lobby-start"),
     lobbyWait: $("#lobby-wait"),
     modes: $("#lobby-modes"),
+    profileScreen: $("#screen-profile"),
+    profName: $("#prof-name"),
+    profBadge: $("#prof-badge"),
+    profModes: $("#prof-modes"),
+    profEmpty: $("#prof-empty"),
+    profTiles: $("#prof-tiles"),
+    profRarity: $("#prof-rarity"),
+    profRecent: $("#prof-recent"),
+    profCompare: $("#prof-compare"),
+    profTip: $("#prof-tip"),
     progress: $("#mp-progress"),
     roomTag: $("#mp-room-tag"),
     category: $("#mp-category"),
@@ -275,6 +285,11 @@
   function update() {
     if (!room) return;
     const dive = room.dive;
+    // A profile opened from the room stays up until a prompt is in play.
+    if (viewing) {
+      if (dive && dive.state && dive.state.status === "playing") closeProfile();
+      else return;
+    }
     if (!dive || !dive.state || dive.state.status === "lobby") return renderLobby();
     if (dive.state.status === "done") return renderEnd(dive);
     renderPlay(dive);
@@ -290,7 +305,7 @@
     el.lobbyLink.value = location.origin + location.pathname + "?" + roomQuery(code);
     el.lobbyPlayers.innerHTML = ids.map((id) => `
       <li class="${id === uid ? "me" : ""}${room.players[id].online === false ? " away" : ""}">
-        <span class="who">${esc(room.players[id].name)}${id === uid ? " <em>you</em>" : ""}${id === room.host ? ' <span class="host">host</span>' : ""}</span>
+        <span class="who"><button type="button" class="who-link" data-profile="${esc(id)}" title="View profile"><b>${esc(room.players[id].name)}</b></button>${id === uid ? " <em>you</em>" : ""}${id === room.host ? ' <span class="host">host</span>' : ""}</span>
         <span class="wins">${profiles[id] ? winsBadge(profiles[id].wins) : ""}</span>
       </li>`).join("");
     ids.filter((id) => !profiles[id]).forEach(async (id) => {
@@ -433,7 +448,14 @@
       tier: hit ? hit.tier : -1,
       points: hit ? DD.TIERS[hit.tier].points : 0,
       at: net.serverNow(),
+      ms: answerMs(),
     });
+  }
+
+  // Milliseconds from the question opening to this answer, for answer-speed stats.
+  function answerMs() {
+    const st = room && room.dive && room.dive.state;
+    return st ? Math.max(0, Math.round(net.serverNow() - (st.startedAt + LEAD_MS))) : 0;
   }
 
   // First valid answer wins: one atomic write, so two near-simultaneous answers
@@ -444,7 +466,7 @@
     const r = mine.round;
     el.input.disabled = true;
     const res = await net.transaction(`rooms/${code}/dive/claims/${r}`, (cur) => (cur ? undefined : {
-      uid, answer: hit.label, tier: hit.tier, points: DD.TIERS[hit.tier].points, at: net.serverNow(),
+      uid, answer: hit.label, tier: hit.tier, points: DD.TIERS[hit.tier].points, at: net.serverNow(), ms: answerMs(),
     }));
     el.input.disabled = false;
     mine.claiming = false;
@@ -546,7 +568,7 @@
     el.endBoard.innerHTML = ids.map((id, i) => `
       <li class="${id === uid ? "me" : ""}${winners.includes(id) ? " winner" : ""}">
         <span class="rank">${i + 1}</span>
-        <span class="who">${esc(nameOf(id))}${id === uid ? " <em>you</em>" : ""}</span>
+        <span class="who"><button type="button" class="who-link" data-profile="${esc(id)}" title="View profile"><b>${esc(nameOf(id))}</b></button>${id === uid ? " <em>you</em>" : ""}</span>
         <span class="tiers">${dive.prompts.map((_, r) => {
           const a = answersFor(dive, r)[id];
           return a && a.tier >= 0 ? DD.TIERS[a.tier].glyph : "⬛";
@@ -567,10 +589,225 @@
     const won = winners.includes(uid);
     const flag = await net.transaction(`rooms/${code}/dive/counted/${uid}`, (cur) => (cur ? undefined : { won }));
     if (!flag.committed) return;
-    await net.transaction(`players/${uid}`, (p) => {
-      p = p || { name: profile.name };
-      return Object.assign({}, p, { wins: (p.wins || 0) + (won ? 1 : 0), dives: (p.dives || 0) + 1 });
+    const sum = diveSummary(dive, won);
+    const count = (p, extra) => Object.assign({}, p, {
+      wins: (p.wins || 0) + (won ? 1 : 0),
+      dives: (p.dives || 0) + 1,
+    }, extra ? extra(p) : {});
+    try {
+      await net.transaction(`players/${uid}`, (p) => count(p || { name: profile.name },
+        (q) => ({ stats: addToStats(q.stats, sum), history: addToHistory(q.history, sum) })));
+    } catch (e) {
+      // Older database rules refuse the stats fields: still record the win.
+      console.warn("Deep Dive: couldn't save detailed stats", e);
+      await net.transaction(`players/${uid}`, (p) => count(p || { name: profile.name }));
+    }
+  }
+
+  // This player's numbers for one finished dive.
+  function diveSummary(dive, won) {
+    const t = totals(dive, dive.prompts.length - 1), ids = playerIds();
+    const s = { mode: isFrenzy(dive) ? "frenzy" : "classic", rounds: dive.prompts.length, answers: 0, misses: 0,
+      points: 0, tiers: [0, 0, 0, 0, 0, 0], msTotal: 0, msCount: 0, fastestMs: 0,
+      depth: t[uid] || 0, place: 1 + ids.filter((id) => (t[id] || 0) > (t[uid] || 0)).length,
+      players: ids.length, won };
+    for (let r = 0; r < dive.prompts.length; r++) {
+      const a = answersFor(dive, r)[uid];
+      if (!a || !(a.tier >= 0)) { s.misses++; continue; }
+      s.answers++; s.points += a.points || 0; s.tiers[a.tier]++;
+      if (a.ms >= 0) { s.msTotal += a.ms; s.msCount++; s.fastestMs = s.fastestMs ? Math.min(s.fastestMs, a.ms) : a.ms; }
+    }
+    return s;
+  }
+
+  // Running totals per mode, stored on the player's profile.
+  function addToStats(stats, s) {
+    stats = Object.assign({}, stats || {});
+    const m = Object.assign({ dives: 0, contested: 0, wins: 0, rounds: 0, answers: 0, misses: 0, points: 0,
+      tiers: [0, 0, 0, 0, 0, 0], msTotal: 0, msCount: 0, fastestMs: 0, depthTotal: 0, bestDepth: 0,
+      placeTotal: 0, podiums: 0 }, stats[s.mode] || {});
+    const tiers = [0, 1, 2, 3, 4, 5].map((i) => ((m.tiers && m.tiers[i]) || 0) + s.tiers[i]);
+    const contested = s.players >= 2;
+    stats[s.mode] = Object.assign(m, {
+      dives: m.dives + 1, contested: m.contested + (contested ? 1 : 0), wins: m.wins + (s.won ? 1 : 0),
+      rounds: m.rounds + s.rounds, answers: m.answers + s.answers, misses: m.misses + s.misses,
+      points: m.points + s.points, tiers, msTotal: m.msTotal + s.msTotal, msCount: m.msCount + s.msCount,
+      fastestMs: s.fastestMs && (!m.fastestMs || s.fastestMs < m.fastestMs) ? s.fastestMs : m.fastestMs,
+      depthTotal: m.depthTotal + s.depth, bestDepth: Math.max(m.bestDepth, s.depth),
+      placeTotal: m.placeTotal + (contested ? s.place : 0),
+      podiums: m.podiums + (contested && s.place <= 3 ? 1 : 0),
     });
+    return stats;
+  }
+
+  // The last 30 dives, for the profile's recent-dives chart.
+  function addToHistory(history, s) {
+    const at = net.serverNow();
+    const all = Object.assign({}, history || {}, {
+      ["d" + at]: { mode: s.mode, depth: s.depth, place: s.place, players: s.players, won: s.won, at },
+    });
+    const keep = Object.keys(all).sort((a, b) => all[b].at - all[a].at).slice(0, 30);
+    return Object.fromEntries(keep.map((k) => [k, all[k]]));
+  }
+
+  // ---------- diver profile (multiplayer stats) ----------
+
+  const MODE_COLOUR = { classic: "#1fa98a", frenzy: "#d95926" };
+  const RARITY_RAMP = ["#dcefff", "#afd6fb", "#82b9f2", "#5a9be6", "#3f7dd6", "#3264c2"]; // shallow -> deep
+  const MODE_NAME = { classic: "Classic", frenzy: "Feeding frenzy" };
+  let viewing = null;             // { id, back, off, data, mode }
+
+  function openProfile(id) {
+    if (!net || !id) return;
+    closeProfile(true);
+    const back = !el.end.hidden ? "end" : room ? "lobby" : "home";
+    viewing = { id, back, mode: "all", data: null };
+    el.profName.textContent = (room && room.players && room.players[id] && room.players[id].name) || "Diver";
+    el.profTiles.innerHTML = el.profRarity.innerHTML = el.profRecent.innerHTML = el.profCompare.innerHTML = "";
+    el.profEmpty.hidden = false;
+    el.profEmpty.textContent = "Loading…";
+    DD.show(el.profileScreen);
+    viewing.off = net.on(`players/${id}`, (p) => { if (viewing && viewing.id === id) { viewing.data = p || {}; drawProfile(); } });
+  }
+
+  function closeProfile(silent) {
+    if (!viewing) return;
+    if (viewing.off) viewing.off();
+    const back = viewing.back;
+    viewing = null;
+    el.profTip.hidden = true;
+    if (silent) return;
+    if (room) { el.lobby.dataset.key = ""; el.end.dataset.key = ""; update(); }
+    else DD.show(el.home);
+    if (!room && back === "home") renderProfile();
+  }
+
+  // Sum the per-mode totals into one set for "All".
+  function statsFor(p, mode) {
+    const s = (p && p.stats) || {};
+    const pick = mode === "all" ? [s.classic, s.frenzy] : [s[mode]];
+    const out = { dives: 0, contested: 0, wins: 0, rounds: 0, answers: 0, misses: 0, points: 0, tiers: [0, 0, 0, 0, 0, 0],
+      msTotal: 0, msCount: 0, fastestMs: 0, depthTotal: 0, bestDepth: 0, placeTotal: 0, podiums: 0 };
+    pick.filter(Boolean).forEach((m) => {
+      Object.keys(out).forEach((k) => {
+        if (k === "tiers") out.tiers = out.tiers.map((v, i) => v + ((m.tiers && m.tiers[i]) || 0));
+        else if (k === "bestDepth") out.bestDepth = Math.max(out.bestDepth, m.bestDepth || 0);
+        else if (k === "fastestMs") out.fastestMs = m.fastestMs && (!out.fastestMs || m.fastestMs < out.fastestMs) ? m.fastestMs : out.fastestMs;
+        else out[k] += m[k] || 0;
+      });
+    });
+    return out;
+  }
+
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "–");
+  const avg = (a, b, digits = 0) => (b ? (a / b).toFixed(digits) : "–");
+  const secs = (ms) => (ms ? (ms / 1000).toFixed(1) + "s" : "–");
+
+  function drawProfile() {
+    const p = viewing.data || {}, mode = viewing.mode, s = statsFor(p, mode);
+    el.profName.textContent = p.name || el.profName.textContent;
+    el.profBadge.innerHTML = winsBadge(p.wins, true);
+    el.profModes.querySelectorAll("[data-pmode]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.pmode === mode)));
+
+    // Totals from before detailed tracking began only exist for "All".
+    const games = mode === "all" ? Math.max(p.dives || 0, s.dives) : s.dives;
+    const wins = mode === "all" ? Math.max(p.wins || 0, s.wins) : s.wins;
+    el.profEmpty.hidden = s.dives > 0;
+    el.profEmpty.textContent = !s.dives
+      ? (games ? "Detailed stats start counting from the next multiplayer dive." : `No ${mode === "all" ? "multiplayer" : MODE_NAME[mode]} dives yet.`)
+      : "";
+
+    const tiles = [
+      ["Games played", DD.fmt(games)],
+      ["Wins", DD.fmt(wins)],
+      ["Win rate", pct(s.wins, s.contested), "games with 2+ divers"],
+      ["Answers", DD.fmt(s.answers), `${DD.fmt(s.rounds)} prompts`],
+      ["Avg points per answer", avg(s.points, s.answers, 1), "out of 100"],
+      ["Miss rate", pct(s.misses, s.rounds), mode === "frenzy" ? "rounds not claimed" : "prompts without a right answer"],
+      ["Leviathans found", DD.fmt(s.tiers[5])],
+      ["Avg answer time", secs(s.msCount ? s.msTotal / s.msCount : 0), s.fastestMs ? `fastest ${secs(s.fastestMs)}` : ""],
+      ["Best dive", s.bestDepth ? DD.fmt(s.bestDepth) + " m" : "–", s.dives ? `avg ${DD.fmt(Math.round(s.depthTotal / s.dives))} m` : ""],
+      ["Avg finish", s.contested ? "#" + avg(s.placeTotal, s.contested, 1) : "–", s.contested ? `${pct(s.podiums, s.contested)} top 3` : ""],
+    ];
+    el.profTiles.innerHTML = tiles.map(([k, v, sub]) => `<div><dt>${k}</dt><dd>${v}${sub ? `<small>${sub}</small>` : ""}</dd></div>`).join("");
+
+    drawRarity(s);
+    drawRecent(p, mode);
+    drawCompare(p);
+  }
+
+  function drawRarity(s) {
+    const total = s.answers || 0, max = Math.max(1, ...s.tiers);
+    el.profRarity.innerHTML = `<div class="rar">${DD.TIERS.map((t, i) => `
+      <div class="rar-row" title="${t.name}: ${s.tiers[i]} answers (${pct(s.tiers[i], total)})">
+        <span class="nm">${t.name}</span>
+        <span class="rar-track"><span class="rar-fill" style="display:block;width:${(100 * s.tiers[i]) / max}%;background:${RARITY_RAMP[i]}"></span></span>
+        <span class="val">${DD.fmt(s.tiers[i])} <span>${pct(s.tiers[i], total)}</span></span>
+      </div>`).join("")}</div>`;
+  }
+
+  function drawRecent(p, mode) {
+    const all = Object.values(p.history || {}).sort((a, b) => a.at - b.at);
+    const list = all.filter((h) => mode === "all" || h.mode === mode).slice(-20);
+    if (!list.length) { el.profRecent.innerHTML = `<p class="feedback">No dives to show yet.</p>`; return; }
+    const W = 360, H = 170, padL = 34, padB = 14, padT = 16, n = 20;
+    const top = Math.max(1000, ...list.map((h) => h.depth));
+    const step = top > 4000 ? 2000 : top > 2000 ? 1000 : 500;
+    const yMax = Math.ceil(top / step) * step;
+    const y = (v) => padT + (H - padT - padB) * (1 - v / yMax);
+    const slot = (W - padL) / n, bw = Math.max(6, Math.min(18, slot - 6));
+    const grid = [];
+    for (let v = 0; v <= yMax; v += step) grid.push(v);
+    const bars = list.map((h, i) => {
+      const x = padL + slot * (n - list.length + i) + (slot - bw) / 2, yt = y(h.depth), hgt = Math.max(2, y(0) - yt);
+      const date = new Date(h.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      const tip = `<b>${DD.fmt(h.depth)} m</b>${MODE_NAME[h.mode]} · ${date}<br>${h.won ? "Won" : `Finished #${h.place} of ${h.players}`}`;
+      return `<g class="bar" data-tip="${esc(tip)}">
+        <rect x="${x - (slot - bw) / 2}" y="${padT}" width="${slot}" height="${H - padT - padB}" fill="transparent"/>
+        <path d="M${x},${y(0)} V${yt + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} Z" fill="${MODE_COLOUR[h.mode]}"/>
+        ${h.won ? `<circle cx="${x + bw / 2}" cy="${yt - 8}" r="4.5" fill="#e8f6f8" stroke="#0c2a3d" stroke-width="2"/>` : ""}
+      </g>`;
+    }).join("");
+    const modes = [...new Set(list.map((h) => h.mode))];
+    el.profRecent.innerHTML = `<div class="recent">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Depth reached in the last ${list.length} dives">
+        ${grid.map((v) => `<line x1="${padL}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(169,198,205,${v ? 0.12 : 0.35})"/>
+          <text x="${padL - 8}" y="${y(v) + 4}" text-anchor="end">${v >= 1000 ? v / 1000 + "k" : v}</text>`).join("")}
+        ${bars}
+      </svg>
+      <div class="legend">${modes.map((m) => `<span><i style="background:${MODE_COLOUR[m]}"></i>${MODE_NAME[m]}</span>`).join("")}
+        <span><i class="dot"></i>Won</span><span style="color:var(--ink-faint)">Oldest → newest, metres</span></div>
+    </div>`;
+  }
+
+  function drawCompare(p) {
+    const c = statsFor(p, "classic"), f = statsFor(p, "frenzy");
+    const rows = [
+      ["Games played", (s) => DD.fmt(s.dives)],
+      ["Wins", (s) => DD.fmt(s.wins)],
+      ["Win rate", (s) => pct(s.wins, s.contested)],
+      ["Answers", (s) => DD.fmt(s.answers)],
+      ["Avg points per answer", (s) => avg(s.points, s.answers, 1)],
+      ["Miss rate", (s) => pct(s.misses, s.rounds)],
+      ["Leviathans found", (s) => DD.fmt(s.tiers[5])],
+      ["Rare answers (Octopus+)", (s) => pct(s.tiers[3] + s.tiers[4] + s.tiers[5], s.answers)],
+      ["Avg answer time", (s) => secs(s.msCount ? s.msTotal / s.msCount : 0)],
+      ["Fastest answer", (s) => secs(s.fastestMs)],
+      ["Avg depth per dive", (s) => (s.dives ? DD.fmt(Math.round(s.depthTotal / s.dives)) + " m" : "–")],
+      ["Best dive", (s) => (s.bestDepth ? DD.fmt(s.bestDepth) + " m" : "–")],
+    ];
+    el.profCompare.innerHTML = `<thead><tr><th scope="col"></th><th scope="col">Classic</th><th scope="col">Frenzy</th></tr></thead>
+      <tbody>${rows.map(([k, fn]) => `<tr><td>${k}</td><td>${fn(c)}</td><td>${fn(f)}</td></tr>`).join("")}</tbody>`;
+  }
+
+  function showTip(e) {
+    const g = e.target.closest && e.target.closest("[data-tip]");
+    if (!g) { el.profTip.hidden = true; return; }
+    el.profTip.innerHTML = g.dataset.tip;
+    el.profTip.hidden = false;
+    const r = el.profTip.getBoundingClientRect();
+    el.profTip.style.left = Math.min(window.innerWidth - r.width - 8, e.clientX + 12) + "px";
+    el.profTip.style.top = Math.max(8, e.clientY - r.height - 12) + "px";
   }
 
   // ---------- wiring ----------
@@ -584,6 +821,18 @@
   el.joinForm.addEventListener("submit", joinRoom);
   el.form.addEventListener("submit", submit);
   el.startBtn.addEventListener("click", startDive);
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-profile]");
+    if (b) openProfile(b.dataset.profile);
+  });
+  $("#mp-view-profile").addEventListener("click", () => { if (uid) openProfile(uid); });
+  $("#prof-back").addEventListener("click", () => closeProfile());
+  el.profModes.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pmode]");
+    if (b && viewing) { viewing.mode = b.dataset.pmode; drawProfile(); }
+  });
+  el.profRecent.addEventListener("pointermove", showTip);
+  el.profRecent.addEventListener("pointerleave", () => { el.profTip.hidden = true; });
   el.modes.addEventListener("click", (e) => {
     const b = e.target.closest("[data-mode]");
     if (b && isHost() && room) net.update(`rooms/${code}`, { mode: b.dataset.mode });
@@ -599,7 +848,7 @@
     await leaveRoom();
     openHome();
   }));
-  document.addEventListener("deepdive:menu", () => { leaveRoom(); if (offProfile) offProfile(); offProfile = null; });
+  document.addEventListener("deepdive:menu", () => { closeProfile(true); leaveRoom(); if (offProfile) offProfile(); offProfile = null; });
 
   // Opening a shared room link goes straight to the join screen with the code filled in.
   if (new URLSearchParams(location.search).get("room")) openHome();
