@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deep Dive</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A category word game: name something, and the rarer your answer, the deeper you sink. Unlimited prompts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one play column over a sea that darkens with depth, a real-scale
+   depth gauge (0 – 11,000 m, ocean zones marked) pinned beside it. */
+:root {
+  color-scheme: dark;
+  --ink: #e8f6f8;
+  --ink-soft: #a9c6cd;
+  --ink-faint: #6f8f99;
+  --glass: rgba(4, 22, 34, 0.55);
+  --glass-edge: rgba(160, 230, 240, 0.16);
+  --lure: #7ff5d6;
+  --lure-ink: #042018;
+  --danger: #ff8a7a;
+  --sea-top: hsl(193 62% 30%);
+  --sea-bottom: hsl(210 70% 16%);
+  --t0: #a7c0cc; --t1: #ffa98a; --t2: #f6d36b; --t3: #f0809b; --t4: #6fe3ff; --t5: #c9a2ff;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--sea-bottom);
+  color: var(--ink);
+  font: 400 17px/1.5 var(--body);
+}
+#sea {
+  position: fixed; inset: 0; z-index: -1;
+  background: linear-gradient(180deg, var(--sea-top), var(--sea-bottom) 85%);
+  transition: --sea-top 1.4s, --sea-bottom 1.4s, background 1.4s;
+}
+#sea::after {
+  /* faint drifting marine snow */
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 20%, rgba(255,255,255,.35), transparent 60%),
+    radial-gradient(1px 1px at 68% 34%, rgba(255,255,255,.3), transparent 60%),
+    radial-gradient(1.5px 1.5px at 40% 72%, rgba(255,255,255,.25), transparent 60%),
+    radial-gradient(1px 1px at 85% 80%, rgba(255,255,255,.3), transparent 60%),
+    radial-gradient(1px 1px at 25% 55%, rgba(255,255,255,.2), transparent 60%);
+  background-size: 320px 320px;
+  animation: snow 40s linear infinite;
+}
+@keyframes snow { to { background-position: 0 320px; } }
+
+.wrap {
+  max-width: 980px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 40px;
+}
+header.top {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.brand { font: 800 22px/1 var(--display); letter-spacing: -0.01em; }
+.brand span { color: var(--lure); }
+.readout { font: 500 14px/1.2 var(--mono); color: var(--ink-soft); display: flex; gap: 14px; }
+.readout strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+main { min-width: 0; }
+.screen { display: grid; gap: 28px; animation: rise .5s ease-out; }
+@keyframes rise { from { transform: translateY(10px); opacity: .6; } }
+
+h1 {
+  font: 800 clamp(52px, 11vw, 104px)/0.92 var(--display);
+  letter-spacing: -0.035em; margin: 8px 0 0; text-wrap: balance;
+}
+h1 em { font-style: normal; color: var(--lure); }
+.lede { font-size: 20px; color: var(--ink-soft); max-width: 34ch; margin: 0; }
+
+.label {
+  font: 700 12px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint);
+}
+.ladder { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; max-width: 460px; }
+.ladder li {
+  display: grid; grid-template-columns: 14px 1fr auto auto; align-items: center; gap: 12px;
+  padding: 8px 12px; background: var(--glass); border-radius: 4px;
+}
+.ladder .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
+.ladder .what { color: var(--ink-soft); font-size: 14px; }
+.ladder .pts, .ladder .m { font: 500 14px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.ladder .m { color: var(--ink-faint); min-width: 64px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+button {
+  font: 700 16px/1 var(--body); color: var(--ink); cursor: pointer;
+  border: 1px solid var(--glass-edge); background: var(--glass); border-radius: 999px;
+  padding: 15px 24px; transition: transform .15s, background .15s, border-color .15s;
+}
+button:hover { border-color: var(--lure); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--lure); color: var(--lure-ink); border-color: var(--lure); box-shadow: 0 0 28px rgba(127,245,214,.35); }
+button.primary:hover { background: #a6fbe5; }
+button.link { background: none; border: none; padding: 8px 0; color: var(--ink-soft); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--lure); outline-offset: 3px; }
+
+dl.stats { display: flex; flex-wrap: wrap; gap: 28px; margin: 0; }
+dl.stats dt { font: 700 11px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint); }
+dl.stats dd { margin: 4px 0 0; font: 700 22px var(--mono); font-variant-numeric: tabular-nums; }
+
+/* play */
+.playhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.tanks { display: flex; gap: 6px; }
+.tank { width: 12px; height: 22px; border-radius: 6px; background: var(--lure); box-shadow: 0 0 10px rgba(127,245,214,.5); }
+.tank.empty { background: transparent; border: 1px solid var(--ink-faint); box-shadow: none; }
+.category {
+  font: 800 clamp(36px, 7vw, 64px)/1.02 var(--display); letter-spacing: -0.025em;
+  margin: 0; text-wrap: balance; min-height: 1em;
+}
+.oxygen { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; }
+.oxygen .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+.oxygen .fill { height: 100%; background: var(--lure); transform-origin: left; box-shadow: 0 0 14px var(--lure); }
+.oxygen.low .fill { background: var(--danger); box-shadow: 0 0 14px var(--danger); }
+.oxygen .secs { font: 700 20px var(--mono); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+.oxygen.low .secs { color: var(--danger); }
+
+form.answer { display: flex; gap: 10px; }
+form.answer input {
+  flex: 1; min-width: 0; font: 400 22px var(--body); color: var(--ink);
+  background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 12px; padding: 16px 18px;
+}
+form.answer input:focus { outline: none; border-color: var(--lure); box-shadow: 0 0 0 3px rgba(127,245,214,.2); }
+form.answer input::placeholder { color: var(--ink-faint); }
+.shake { animation: shake .35s; }
+@keyframes shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+.feedback { min-height: 1.5em; margin: -14px 0 0; color: var(--ink-soft); }
+.feedback.miss { color: var(--danger); }
+
+.reveal { display: grid; gap: 16px; padding: 22px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; }
+.verdict { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 24px; }
+.verdict strong { font: 800 28px/1.1 var(--display); }
+.verdict .gain { font: 700 18px var(--mono); color: var(--c, var(--ink-soft)); }
+.verdict .lost { font: 700 14px var(--mono); color: var(--danger); }
+.chip {
+  font: 700 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em;
+  padding: 6px 9px; border-radius: 4px; color: #061219; background: var(--c, var(--ink-faint));
+}
+.verdict.out .chip { background: var(--danger); }
+.deeper { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.deeper .label { flex-basis: 100%; }
+.pill { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--c); color: var(--c); font-size: 15px; }
+#next { justify-self: start; }
+
+.tier-0 { --c: var(--t0); } .tier-1 { --c: var(--t1); } .tier-2 { --c: var(--t2); }
+.tier-3 { --c: var(--t3); } .tier-4 { --c: var(--t4); } .tier-5 { --c: var(--t5); }
+.tier-out { --c: var(--danger); }
+
+/* end */
+.end-depth { font: 800 clamp(64px, 14vw, 120px)/0.9 var(--display); letter-spacing: -0.04em; margin: 0; font-variant-numeric: tabular-nums; }
+.end-zone { margin: 6px 0 0; font: 500 16px var(--mono); color: var(--lure); }
+ol.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+ol.log li {
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto 72px; gap: 12px; align-items: center;
+  padding: 10px 14px; background: var(--glass); border-left: 3px solid var(--c); border-radius: 0 4px 4px 0;
+}
+.log-prompt { color: var(--ink-soft); font-size: 15px; }
+.log-answer { font-weight: 700; overflow-wrap: anywhere; }
+.log-m { font: 500 14px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.share { display: grid; gap: 10px; }
+.share textarea {
+  font: 500 15px/1.5 var(--mono); color: var(--ink); background: var(--glass); resize: none;
+  border: 1px solid var(--glass-edge); border-radius: 10px; padding: 12px 14px; height: 76px; width: 100%;
+}
+.share .row { display: flex; align-items: center; gap: 14px; }
+.copied { color: var(--lure); font-size: 14px; }
+
+/* gauge */
+aside.gauge { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); height: min(78vh, 640px); align-self: start; }
+.gauge .scale { position: absolute; inset: 0 auto 0 0; width: 2px; background: linear-gradient(var(--ink-soft), var(--ink-faint)); opacity: .5; }
+.gauge .zone { position: absolute; left: 0; padding-left: 12px; transform: translateY(-1px); }
+.gauge .zone::before { content: ""; position: absolute; left: 0; top: 0; width: 8px; height: 1px; background: var(--ink-faint); }
+.gauge .zone b { display: block; font: 700 11px/1.2 var(--mono); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .08em; }
+.gauge .zone small { font: 500 11px var(--mono); color: var(--ink-faint); }
+#gauge-marker {
+  --t: 0; position: absolute; left: -7px; top: calc(var(--t) * 100%);
+  width: 16px; height: 16px; border-radius: 50%; transform: translateY(-50%);
+  background: var(--lure); box-shadow: 0 0 0 4px rgba(127,245,214,.2), 0 0 22px var(--lure);
+  transition: top 1.2s cubic-bezier(.3,.7,.3,1);
+}
+
+/* descent scene between prompts */
+main { transition: opacity .25s; }
+body.descending main { opacity: 0; pointer-events: none; }
+.descent {
+  position: fixed; inset: 0; z-index: 5; cursor: pointer;
+  animation: fade-in .3s ease-out;
+}
+.descent.leaving { opacity: 0; transition: opacity .25s; }
+@keyframes fade-in { from { opacity: 0; } }
+.descent canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.descent .stage {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  display: grid; justify-items: center; pointer-events: none;
+}
+.beam {
+  position: absolute; left: 50%; top: 118px; width: 260px; height: 320px; transform: translateX(-50%);
+  background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(127,245,214,.22), transparent 70%);
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+}
+#diver { width: 70px; height: 140px; overflow: visible; animation: bob 1.6s ease-in-out infinite; }
+#diver .fin-l { transform-origin: 27px 34px; animation: kick .5s ease-in-out infinite alternate; }
+#diver .fin-r { transform-origin: 43px 34px; animation: kick .5s ease-in-out infinite alternate-reverse; }
+#diver.drifting { animation-duration: 3s; }
+#diver.drifting .fin-l, #diver.drifting .fin-r { animation-duration: 1.4s; }
+@keyframes kick { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes bob { 50% { transform: translateX(3px) rotate(2deg); } }
+.descent-readout {
+  position: absolute; left: 0; right: 0; top: calc(42% + 112px);
+  display: grid; justify-items: center; gap: 8px; text-align: center; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#descent-depth {
+  font: 800 clamp(48px, 10vw, 84px)/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 30px rgba(0,0,0,.5);
+}
+.descent-note { font: 700 14px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--c, var(--ink-soft)); }
+.descent-zone { font: 500 15px var(--mono); color: var(--lure); min-height: 1.4em; opacity: 0; }
+.descent-zone.flash { animation: zone 2.4s ease-out forwards; }
+@keyframes zone { 15%, 70% { opacity: 1; } 100% { opacity: .75; } }
+.descent-skip {
+  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 0; right: 0; text-align: center;
+  font: 500 12px var(--mono); color: var(--ink-faint); letter-spacing: .08em; text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  aside.gauge { display: none; }
+  ol.log li { grid-template-columns: minmax(0, 1fr) auto; }
+  .log-prompt { grid-column: 1 / -1; }
+  .log-m { display: none; }
+  form.answer { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="sea" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Deep <span>Dive</span></div>
+    <div class="readout" aria-live="polite"><strong id="depth-now">0 m</strong><span id="zone-now">Sunlight zone</span></div>
+  </header>
+
+  <main>
+    <section class="screen" id="screen-start">
+      <div>
+        <h1>The rarer the answer, the <em>deeper</em> you go.</h1>
+      </div>
+      <p class="lede">Each prompt names a category. Type anything that fits before your air runs out. Obvious answers barely get you wet. Obscure ones send you to the trench.</p>
+      <div>
+        <p class="label">Rarity tiers · every point is 10 metres</p>
+        <ol class="ladder">
+          <li class="tier-0"><span class="dot"></span><span>Plankton <span class="what">· the obvious one</span></span><span class="pts">10 pts</span><span class="m">100 m</span></li>
+          <li class="tier-1"><span class="dot"></span><span>Krill <span class="what">· common</span></span><span class="pts">25 pts</span><span class="m">250 m</span></li>
+          <li class="tier-2"><span class="dot"></span><span>Seahorse <span class="what">· solid</span></span><span class="pts">40 pts</span><span class="m">400 m</span></li>
+          <li class="tier-3"><span class="dot"></span><span>Octopus <span class="what">· uncommon</span></span><span class="pts">60 pts</span><span class="m">600 m</span></li>
+          <li class="tier-4"><span class="dot"></span><span>Anglerfish <span class="what">· rare</span></span><span class="pts">85 pts</span><span class="m">850 m</span></li>
+          <li class="tier-5"><span class="dot"></span><span>Leviathan <span class="what">· the single rarest</span></span><span class="pts">100 pts</span><span class="m">1,000 m</span></li>
+        </ol>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" data-start="dive">Start a dive · 7 prompts</button>
+        <button type="button" data-start="endless">Endless dive · 3 air tanks</button>
+      </div>
+      <p class="label" style="margin:0">25 seconds per prompt · a wrong guess costs 2 seconds · dive again as often as you like</p>
+      <dl class="stats" id="stats"></dl>
+    </section>
+
+    <section class="screen" id="screen-play" hidden>
+      <div class="playhead">
+        <span class="label" id="progress">Prompt 1 of 7</span>
+        <span class="tanks" id="tanks" hidden></span>
+      </div>
+      <h2 class="category" id="category"></h2>
+      <div class="oxygen" id="oxygen">
+        <div class="bar"><div class="fill" id="oxygen-fill"></div></div>
+        <span class="secs" id="seconds">25</span>
+      </div>
+      <form class="answer" id="answer-form" autocomplete="off">
+        <label for="answer" class="label" hidden>Your answer</label>
+        <input id="answer" name="answer" type="text" placeholder="Type an answer and press Enter" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+        <button class="primary" type="submit">Dive</button>
+      </form>
+      <p class="feedback" id="feedback" aria-live="assertive"></p>
+      <div class="reveal" id="reveal" hidden aria-live="polite"></div>
+      <button type="button" class="next primary" id="next" hidden></button>
+      <div><button class="link" type="button" data-menu>Quit to menu</button></div>
+    </section>
+
+    <section class="screen" id="screen-end" hidden>
+      <div>
+        <p class="label" id="end-title">Dive complete</p>
+        <p class="end-depth" id="end-depth">0 m</p>
+        <p class="end-zone" id="end-zone"></p>
+      </div>
+      <ol class="log" id="log"></ol>
+      <div class="share">
+        <label class="label" for="share-text">Share your dive</label>
+        <textarea id="share-text" readonly></textarea>
+        <div class="row"><button type="button" id="copy">Copy result</button><span class="copied" id="copied" aria-live="polite"></span></div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" data-start="dive">Dive again</button>
+        <button type="button" data-start="endless">Endless dive</button>
+        <button class="link" type="button" data-menu>Menu</button>
+      </div>
+    </section>
+  </main>
+
+  <aside class="gauge" aria-hidden="true">
+    <div class="scale"></div>
+    <div class="zone" style="top:0%"><b>Sunlight</b><small>0 m</small></div>
+    <div class="zone" style="top:9.09%"><b>Midnight</b><small>1,000 m</small></div>
+    <div class="zone" style="top:36.36%"><b>Abyss</b><small>4,000 m</small></div>
+    <div class="zone" style="top:54.54%"><b>Hadal</b><small>6,000 m</small></div>
+    <div class="zone" style="top:63.6%"><b>Perfect dive</b><small>7,000 m</small></div>
+    <div class="zone" style="top:99.4%"><b>Challenger Deep</b><small>10,935 m</small></div>
+    <div id="gauge-marker"></div>
+  </aside>
+</div>
+<div class="descent" id="descent" hidden aria-live="polite">
+  <canvas id="descent-canvas" aria-hidden="true"></canvas>
+  <div class="stage" aria-hidden="true">
+    <div class="beam"></div>
+    <!-- head-down diver: fins at the top, mask and regulator at the bottom -->
+    <svg id="diver" viewBox="0 0 70 140">
+      <polygon class="fin-l" points="22,34 32,34 30,2 12,6" fill="#f6d36b"/>
+      <polygon class="fin-r" points="38,34 48,34 58,6 40,2" fill="#f6d36b"/>
+      <rect x="22" y="28" width="11" height="44" rx="5.5" fill="#24485a"/>
+      <rect x="37" y="28" width="11" height="44" rx="5.5" fill="#24485a"/>
+      <rect x="26" y="58" width="18" height="40" rx="4" fill="#c9d6db"/>
+      <rect x="19" y="64" width="32" height="44" rx="12" fill="#2d5a70"/>
+      <rect x="19" y="84" width="32" height="5" fill="#16303d"/>
+      <path d="M21 104 L14 134 M49 104 L56 134" stroke="#2d5a70" stroke-width="8" stroke-linecap="round" fill="none"/>
+      <circle cx="35" cy="118" r="13" fill="#1d3a4a"/>
+      <rect x="25" y="114" width="20" height="10" rx="4" fill="#7ff5d6"/>
+      <rect x="28" y="116" width="6" height="3" rx="1.5" fill="#e8f6f8" opacity=".7"/>
+      <circle cx="40" cy="132" r="3.5" fill="#16303d"/>
+    </svg>
+  </div>
+  <div class="descent-readout">
+    <div id="descent-depth">0 m</div>
+    <div class="descent-note" id="descent-note"></div>
+    <div class="descent-zone" id="descent-zone"></div>
+  </div>
+  <div class="descent-skip">Tap or press Enter to skip</div>
+</div>
+<script src="prompts.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
