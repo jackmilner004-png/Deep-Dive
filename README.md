@@ -49,6 +49,10 @@ config, the button is hidden. To switch it on:
 6. Paste it into `firebase-config.js` as `window.DEEP_DIVE_FIREBASE = { ... };`
    and push. The config values aren't secret; the database rules control access.
 
+Win counts unlock animated badges in the lobby and on your profile: Glow at 5
+wins, Embers at 10, Flame at 20, then each time wins double: Plasma at 40,
+Aurora at 80, Prism at 160 and Dark matter from 320.
+
 To try multiplayer without Firebase, open the page with `?local=1` in two tabs
 of the same browser: each tab is a separate player.
 

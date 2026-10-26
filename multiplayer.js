@@ -67,6 +67,34 @@
   }
 
   const esc = (s) => DD.escapeHtml(String(s ?? ""));
+
+  // Win milestones: 5, 10, 20, then each doubling. Each unlocks a showier badge.
+  const WIN_TIERS = [
+    { at: 5, name: "Glow" }, { at: 10, name: "Embers" }, { at: 20, name: "Flame" },
+    { at: 40, name: "Plasma" }, { at: 80, name: "Aurora" }, { at: 160, name: "Prism" },
+    { at: 320, name: "Dark matter" },
+  ];
+  const winLevel = (n) => WIN_TIERS.filter((t) => n >= t.at).length;
+
+  function winsBadge(wins, big) {
+    const n = wins || 0, lvl = winLevel(n);
+    const tier = lvl ? WIN_TIERS[lvl - 1].name : "";
+    const sparks = lvl >= 2 ? Array.from({ length: 6 + lvl }, (_, k) =>
+      `<i style="--k:${k};--x:${8 + (k * 37) % 84}%;--y:${10 + (k * 29) % 80}%"></i>`).join("") : "";
+    // The effect wraps only the number; "wins" sits beside it as plain text.
+    return `<span class="wb lvl-${lvl}${big ? " wb-lg" : ""}"${tier ? ` title="${tier}: ${n} wins"` : ""}>` +
+      `<span class="wb-core"><span class="wb-fx" aria-hidden="true">${sparks}</span>` +
+      `<span class="wb-n">${DD.fmt(n)}</span></span>` +
+      (big ? "" : `<span class="wb-unit">${n === 1 ? "win" : "wins"}</span>`) + `</span>`;
+  }
+
+  function nextMilestone(n) {
+    const next = WIN_TIERS.find((t) => n < t.at);
+    if (next) return `${next.name} at ${next.at} wins`;
+    let at = WIN_TIERS[WIN_TIERS.length - 1].at;
+    while (at <= n) at *= 2;
+    return `Next milestone at ${DD.fmt(at)} wins`;
+  }
   const nameOf = (id) => (room && room.players && room.players[id] && room.players[id].name) || "Diver";
 
   // ---------- home: profile, create, join ----------
@@ -109,7 +137,8 @@
 
   function renderProfile() {
     el.profile.innerHTML = `
-      <div><dt>Wins</dt><dd>${DD.fmt(profile.wins || 0)}</dd></div>
+      <div><dt>Wins${winLevel(profile.wins || 0) ? ` · ${WIN_TIERS[winLevel(profile.wins || 0) - 1].name}` : ""}</dt>
+        <dd>${winsBadge(profile.wins, true)}</dd><dd class="wb-next">${nextMilestone(profile.wins || 0)}</dd></div>
       <div><dt>Multiplayer dives</dt><dd>${DD.fmt(profile.dives || 0)}</dd></div>`;
   }
 
@@ -261,7 +290,7 @@
     el.lobbyPlayers.innerHTML = ids.map((id) => `
       <li class="${id === uid ? "me" : ""}${room.players[id].online === false ? " away" : ""}">
         <span class="who">${esc(room.players[id].name)}${id === uid ? " <em>you</em>" : ""}${id === room.host ? ' <span class="host">host</span>' : ""}</span>
-        <span class="wins">${profiles[id] ? DD.fmt(profiles[id].wins || 0) + " wins" : ""}</span>
+        <span class="wins">${profiles[id] ? winsBadge(profiles[id].wins) : ""}</span>
       </li>`).join("");
     ids.filter((id) => !profiles[id]).forEach(async (id) => {
       profiles[id] = { wins: 0 };
