@@ -226,7 +226,22 @@
 
   // ---------- state ----------
 
+  // Solo stats. All numbers, so they can sync to players/<uid>/solo. Detailed
+  // counters are kept per mode with a "dive_" or "endless_" prefix.
   const stats = Object.assign({ dives: 0, best: 0, bestEndless: 0, prompts: 0 }, load("stats", {}));
+  const HISTORY_MAX = 20;
+  function bump(key, by = 1) { stats[key] = (stats[key] || 0) + by; }
+  function keep(key, value, fn = Math.max) { stats[key] = stats[key] ? fn(stats[key], value) : value; }
+  // Combine two copies of the solo stats (this browser and the account): the
+  // higher of each count, and the lower of each fastest time.
+  function mergeSolo(a, b) {
+    const out = {};
+    new Set([...Object.keys(a || {}), ...Object.keys(b || {})]).forEach((k) => {
+      const x = Number((a || {})[k]) || 0, y = Number((b || {})[k]) || 0;
+      out[k] = k.endsWith("_fastest") && x && y ? Math.min(x, y) : Math.max(x, y);
+    });
+    return out;
+  }
   let game = null;
   let rafId = 0;
 
@@ -300,7 +315,7 @@
   }
 
   function startGame(mode) {
-    game = { mode, round: 0, depth: 0, shownDepth: 0, tanks: ENDLESS_TANKS, log: [] };
+    game = { mode, round: 0, depth: 0, shownDepth: 0, tanks: ENDLESS_TANKS, log: [], streak: 0, bestStreak: 0 };
     setDepth(0);
     show(el.play);
     nextPrompt();
@@ -365,6 +380,7 @@
     if (hit) return finishPrompt(hit);
     el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
+    bump(game.mode + "_guesses");
     hints.offer(game.prompt, raw);
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
@@ -384,14 +400,24 @@
     const p = game.prompt;
     const rarest = p.byTier[5][0];
     let points = 0;
+    const m = game.mode + "_";
+    bump(m + "rounds");
     if (hit) {
       points = TIERS[hit.tier].points;
       game.depth += points * METRES_PER_POINT;
       stats.prompts += 1;
-      save("stats", stats);
-    } else if (game.mode === "endless") {
-      game.tanks -= 1;
+      const ms = Math.round((SECONDS - game.timeLeft) * 1000);
+      bump(m + "answers"); bump(m + "points", points); bump(m + "t" + hit.tier);
+      bump(m + "ms", ms); bump(m + "timed");
+      keep(m + "fastest", Math.max(ms, 1), Math.min);
+      game.streak += 1;
+      game.bestStreak = Math.max(game.bestStreak, game.streak);
+    } else {
+      bump(m + "misses");
+      game.streak = 0;
+      if (game.mode === "endless") game.tanks -= 1;
     }
+    save("stats", stats);
     game.log.push({ prompt: p.prompt, answer: hit ? hit.label : null, tier: hit ? hit.tier : -1, points });
 
     const deeper = hit
@@ -765,7 +791,14 @@
     const prevBest = endless ? stats.bestEndless : stats.best;
     if (endless) stats.bestEndless = Math.max(stats.bestEndless, game.depth);
     else stats.best = Math.max(stats.best, game.depth);
+    const m = game.mode + "_";
+    bump(m + "runs"); bump(m + "depth", game.depth);
+    keep(m + "streak", game.bestStreak);
     save("stats", stats);
+    const history = load("soloHistory", []);
+    history.push({ mode: game.mode, depth: game.depth, at: Date.now(),
+      answered: game.log.filter((r) => r.tier >= 0).length, prompts: game.log.length });
+    save("soloHistory", history.slice(-HISTORY_MAX));
     document.dispatchEvent(new CustomEvent("deepdive:stats"));
 
     el.endTitle.textContent = endless
@@ -820,6 +853,8 @@
     PROMPTS, TIERS, SECONDS, DIVE_LENGTH, METRES_PER_POINT,
     match, suggest, suggester, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
     getStats: () => Object.assign({}, stats),
+    getSoloHistory: () => load("soloHistory", []),
+    mergeSolo,
     setStats(next) { Object.assign(stats, next); save("stats", stats); renderStats(); },
   };
 

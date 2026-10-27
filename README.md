@@ -68,6 +68,15 @@ per answer, miss rate, Leviathans found, answer speed, best and average depth,
 average finishing place, answers by rarity, recent dives, and Classic vs
 Feeding frenzy side by side.
 
+The profile's **Solo** tab covers single-player dives: dives, deepest dive and
+endless run, answers, average points, miss rate, Leviathans, rare answers,
+answer speed, longest streak, wrong guesses per prompt, answers by rarity,
+recent dives, and Dive vs Endless side by side. Open it with **Your stats** on
+the start screen (no multiplayer connection needed). Solo stats are kept in the
+browser (`deepdive.stats`) and copied to `players/<id>/solo` when you play
+multiplayer or sign in, so lobby-mates can see them too. The recent-dives chart
+for solo play is only stored on your own device.
+
 ### Google sign-in (saving progress)
 
 Players can sign in with Google from the start screen or the multiplayer

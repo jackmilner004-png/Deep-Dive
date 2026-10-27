@@ -6,7 +6,6 @@
 
   const DD = window.DeepDive;
   const FLAG = "deepdive.account";            // set once this browser has signed in
-  const SOLO_KEYS = ["dives", "best", "bestEndless", "prompts"];
   const boxes = Array.from(document.querySelectorAll("[data-account]"));
   const params = new URLSearchParams(location.search);
   if (!window.DEEP_DIVE_FIREBASE || params.get("local") === "1") return;
@@ -48,10 +47,10 @@
     try {
       const local = DD.getStats();
       const cloud = (await net.get(`players/${acct.uid}/solo`)) || {};
-      const merged = {};
-      SOLO_KEYS.forEach((k) => { merged[k] = Math.max(local[k] || 0, cloud[k] || 0); });
-      if (SOLO_KEYS.some((k) => merged[k] !== (local[k] || 0))) DD.setStats(merged);
-      if (SOLO_KEYS.some((k) => merged[k] !== (cloud[k] || 0))) await net.set(`players/${acct.uid}/solo`, merged);
+      const merged = DD.mergeSolo(local, cloud);
+      const keys = Object.keys(merged);
+      if (keys.some((k) => merged[k] !== (local[k] || 0))) DD.setStats(merged);
+      if (keys.some((k) => merged[k] !== (cloud[k] || 0))) await net.set(`players/${acct.uid}/solo`, merged);
     } catch (e) {
       console.warn("Deep Dive: couldn't sync solo stats", e);
     }

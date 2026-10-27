@@ -514,6 +514,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         <button class="primary" type="button" data-start="dive">Start a dive · 7 prompts</button>
         <button type="button" data-start="endless">Endless dive · 3 air tanks</button>
         <button type="button" id="open-mp">Play with friends</button>
+        <button type="button" id="open-stats">Your stats</button>
       </div>
       <p class="label" style="margin:0">25 seconds per prompt · guess as many times as you like · dive again as often as you like</p>
       <dl class="stats" id="stats"></dl>
@@ -654,7 +655,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
     <section class="screen" id="screen-profile" hidden>
       <div class="prof-head">
         <div>
-          <p class="label">Diver profile · multiplayer</p>
+          <p class="label" id="prof-kind">Diver profile · multiplayer</p>
           <h2 class="category" id="prof-name"></h2>
         </div>
         <div id="prof-badge"></div>
@@ -663,6 +664,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         <button type="button" role="tab" data-pmode="all" aria-selected="true">All</button>
         <button type="button" role="tab" data-pmode="classic" aria-selected="false">Classic</button>
         <button type="button" role="tab" data-pmode="frenzy" aria-selected="false">Feeding frenzy</button>
+        <button type="button" role="tab" data-pmode="solo" aria-selected="false">Solo</button>
       </div>
       <p class="feedback" id="prof-empty" hidden></p>
       <dl class="tiles" id="prof-tiles"></dl>
@@ -677,7 +679,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         </figure>
       </div>
       <figure class="panel">
-        <figcaption class="label">Classic vs feeding frenzy</figcaption>
+        <figcaption class="label" id="prof-compare-title">Classic vs feeding frenzy</figcaption>
         <div class="table-wrap"><table class="compare" id="prof-compare"></table></div>
       </figure>
       <div><button class="link" type="button" id="prof-back">Back</button></div>

@@ -44,6 +44,9 @@
     profRarity: $("#prof-rarity"),
     profRecent: $("#prof-recent"),
     profCompare: $("#prof-compare"),
+    profCompareTitle: $("#prof-compare-title"),
+    profKind: $("#prof-kind"),
+    start: $("#screen-start"),
     profTip: $("#prof-tip"),
     progress: $("#mp-progress"),
     roomTag: $("#mp-room-tag"),
@@ -127,6 +130,7 @@
       return;
     }
     uid = await net.ready();
+    shareSolo();
     el.status.hidden = true;
     setConnected(true);
     if (offProfile) offProfile();
@@ -656,22 +660,48 @@
 
   // ---------- diver profile (multiplayer stats) ----------
 
-  const MODE_COLOUR = { classic: "#1fa98a", frenzy: "#d95926" };
+  const MODE_COLOUR = { classic: "#1fa98a", frenzy: "#d95926", dive: "#4fa3e3", endless: "#b48ae8" };
   const RARITY_RAMP = ["#dcefff", "#afd6fb", "#82b9f2", "#5a9be6", "#3f7dd6", "#3264c2"]; // shallow -> deep
-  const MODE_NAME = { classic: "Classic", frenzy: "Feeding frenzy" };
+  const MODE_NAME = { classic: "Classic", frenzy: "Feeding frenzy", dive: "Dive", endless: "Endless" };
   let viewing = null;             // { id, back, off, data, mode }
 
   function openProfile(id) {
     if (!net || !id) return;
     closeProfile(true);
     const back = !el.end.hidden ? "end" : room ? "lobby" : "home";
-    viewing = { id, back, mode: "all", data: null };
+    viewing = { id, back, mode: "all", data: null, self: id === uid };
+    showTabs(true);
     el.profName.textContent = (room && room.players && room.players[id] && room.players[id].name) || "Diver";
     el.profTiles.innerHTML = el.profRarity.innerHTML = el.profRecent.innerHTML = el.profCompare.innerHTML = "";
     el.profEmpty.hidden = false;
     el.profEmpty.textContent = "Loading…";
     DD.show(el.profileScreen);
     viewing.off = net.on(`players/${id}`, (p) => { if (viewing && viewing.id === id) { viewing.data = p || {}; drawProfile(); } });
+  }
+
+  // Your own stats from the solo menu. Works without a multiplayer connection;
+  // the multiplayer tabs only appear once this browser has one.
+  function openSoloStats() {
+    closeProfile(true);
+    viewing = { id: uid, back: "start", mode: "solo", data: null, self: true };
+    const acct = net && net.account && net.account();
+    el.profName.textContent = profile.name || DD.load("mpName", "") || ((acct && acct.name) || "").split(" ")[0] || "Your stats";
+    showTabs(!!(net && uid));
+    DD.show(el.profileScreen);
+    drawProfile();
+    if (net && uid) viewing.off = net.on(`players/${uid}`, (p) => { if (viewing && viewing.id === uid) { viewing.data = p || {}; drawProfile(); } });
+  }
+
+  function showTabs(all) {
+    el.profModes.querySelectorAll("[data-pmode]").forEach((b) => { b.hidden = !all && b.dataset.pmode !== "solo"; });
+    el.profModes.hidden = !all;
+  }
+
+  // Put this browser's solo stats on the player record so lobby-mates can see them.
+  async function shareSolo() {
+    if (!net || !uid) return;
+    try { await net.transaction(`players/${uid}/solo`, (cloud) => DD.mergeSolo(DD.getStats(), cloud)); }
+    catch (e) { console.warn("Deep Dive: couldn't share solo stats", e); }
   }
 
   function closeProfile(silent) {
@@ -681,6 +711,7 @@
     viewing = null;
     el.profTip.hidden = true;
     if (silent) return;
+    if (back === "start") { DD.show(el.start); return; }
     if (room) { el.lobby.dataset.key = ""; el.end.dataset.key = ""; update(); }
     else DD.show(el.home);
     if (!room && back === "home") renderProfile();
@@ -710,8 +741,11 @@
   function drawProfile() {
     const p = viewing.data || {}, mode = viewing.mode, s = statsFor(p, mode);
     el.profName.textContent = p.name || el.profName.textContent;
-    el.profBadge.innerHTML = winsBadge(p.wins, true);
+    el.profBadge.innerHTML = viewing.data ? winsBadge(p.wins, true) : "";
     el.profModes.querySelectorAll("[data-pmode]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.pmode === mode)));
+    el.profKind.textContent = mode === "solo" ? "Diver profile · solo" : "Diver profile · multiplayer";
+    el.profCompareTitle.textContent = mode === "solo" ? "Dive vs endless" : "Classic vs feeding frenzy";
+    if (mode === "solo") return drawSolo(p);
 
     // Totals from before detailed tracking began only exist for "All".
     const games = mode === "all" ? Math.max(p.dives || 0, s.dives) : s.dives;
@@ -753,6 +787,11 @@
   function drawRecent(p, mode) {
     const all = Object.values(p.history || {}).sort((a, b) => a.at - b.at);
     const list = all.filter((h) => mode === "all" || h.mode === mode).slice(-20);
+    drawBars(list, (h) => (h.won ? "Won" : `Finished #${h.place} of ${h.players}`), true);
+  }
+
+  // Bar chart of depth per dive, oldest to newest. note(h) is the tooltip's last line.
+  function drawBars(list, note, showWins) {
     if (!list.length) { el.profRecent.innerHTML = `<p class="feedback">No dives to show yet.</p>`; return; }
     const W = 360, H = 170, padL = 34, padB = 14, padT = 16, n = 20;
     const top = Math.max(1000, ...list.map((h) => h.depth));
@@ -765,7 +804,7 @@
     const bars = list.map((h, i) => {
       const x = padL + slot * (n - list.length + i) + (slot - bw) / 2, yt = y(h.depth), hgt = Math.max(2, y(0) - yt);
       const date = new Date(h.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-      const tip = `<b>${DD.fmt(h.depth)} m</b>${MODE_NAME[h.mode]} · ${date}<br>${h.won ? "Won" : `Finished #${h.place} of ${h.players}`}`;
+      const tip = `<b>${DD.fmt(h.depth)} m</b>${MODE_NAME[h.mode]} · ${date}<br>${note(h)}`;
       return `<g class="bar" data-tip="${esc(tip)}">
         <rect x="${x - (slot - bw) / 2}" y="${padT}" width="${slot}" height="${H - padT - padB}" fill="transparent"/>
         <path d="M${x},${y(0)} V${yt + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} Z" fill="${MODE_COLOUR[h.mode]}"/>
@@ -780,7 +819,7 @@
         ${bars}
       </svg>
       <div class="legend">${modes.map((m) => `<span><i style="background:${MODE_COLOUR[m]}"></i>${MODE_NAME[m]}</span>`).join("")}
-        <span><i class="dot"></i>Won</span><span style="color:var(--ink-faint)">Oldest → newest, metres</span></div>
+        ${showWins ? `<span><i class="dot"></i>Won</span>` : ""}<span style="color:var(--ink-faint)">Oldest → newest, metres</span></div>
     </div>`;
   }
 
@@ -802,6 +841,74 @@
     ];
     el.profCompare.innerHTML = `<thead><tr><th scope="col"></th><th scope="col">Classic</th><th scope="col">Frenzy</th></tr></thead>
       <tbody>${rows.map(([k, fn]) => `<tr><td>${k}</td><td>${fn(c)}</td><td>${fn(f)}</td></tr>`).join("")}</tbody>`;
+  }
+
+  // ---------- solo stats ----------
+
+  // One solo mode's counters ("dive" or "endless") from the flat solo record.
+  function soloFor(src, m) {
+    const g = (k) => Number(src[m + "_" + k]) || 0;
+    return { runs: g("runs"), rounds: g("rounds"), answers: g("answers"), misses: g("misses"), points: g("points"),
+      tiers: [0, 1, 2, 3, 4, 5].map((i) => g("t" + i)), ms: g("ms"), timed: g("timed"), fastest: g("fastest"),
+      depth: g("depth"), streak: g("streak"), guesses: g("guesses"),
+      best: Number(m === "dive" ? src.best : src.bestEndless) || 0 };
+  }
+
+  function soloBoth(a, b) {
+    const out = {};
+    Object.keys(a).forEach((k) => {
+      if (k === "tiers") out.tiers = a.tiers.map((v, i) => v + b.tiers[i]);
+      else if (k === "fastest") out.fastest = a.fastest && b.fastest ? Math.min(a.fastest, b.fastest) : a.fastest || b.fastest;
+      else if (k === "streak" || k === "best") out[k] = Math.max(a[k], b[k]);
+      else out[k] = a[k] + b[k];
+    });
+    return out;
+  }
+
+  function drawSolo(p) {
+    const src = viewing.self ? DD.getStats() : (p.solo || {});
+    const d = soloFor(src, "dive"), e = soloFor(src, "endless"), s = soloBoth(d, e);
+    const dives = Math.max(Number(src.dives) || 0, s.runs);
+    el.profEmpty.hidden = s.runs > 0;
+    el.profEmpty.textContent = s.runs ? "" : dives
+      ? "Detailed solo stats start counting from your next dive."
+      : viewing.self ? "No solo dives yet. Start a dive from the main menu." : "No solo stats shared yet.";
+
+    const tiles = [
+      ["Solo dives", DD.fmt(dives), s.runs ? `${DD.fmt(d.runs)} dive · ${DD.fmt(e.runs)} endless` : ""],
+      ["Deepest dive", d.best ? DD.fmt(d.best) + " m" : "–", d.runs ? `avg ${DD.fmt(Math.round(d.depth / d.runs))} m` : "7 prompts"],
+      ["Deepest endless", e.best ? DD.fmt(e.best) + " m" : "–", e.runs ? `avg ${DD.fmt(Math.round(e.depth / e.runs))} m` : "3 air tanks"],
+      ["Answers", DD.fmt(s.runs ? s.answers : Number(src.prompts) || 0), s.rounds ? `${DD.fmt(s.rounds)} prompts` : ""],
+      ["Avg points per answer", avg(s.points, s.answers, 1), "out of 100"],
+      ["Miss rate", pct(s.misses, s.rounds), "prompts that ran out of air"],
+      ["Leviathans found", DD.fmt(s.tiers[5])],
+      ["Rare answers", pct(s.tiers[3] + s.tiers[4] + s.tiers[5], s.answers), "Octopus or deeper"],
+      ["Avg answer time", secs(s.timed ? s.ms / s.timed : 0), s.fastest ? `fastest ${secs(s.fastest)}` : ""],
+      ["Longest streak", s.streak ? DD.fmt(s.streak) : "–", "answers in a row"],
+      ["Wrong guesses", avg(s.guesses, s.rounds, 1), "per prompt"],
+    ];
+    el.profTiles.innerHTML = tiles.map(([k, v, sub]) => `<div><dt>${k}</dt><dd>${v}${sub ? `<small>${sub}</small>` : ""}</dd></div>`).join("");
+
+    drawRarity(s);
+    if (viewing.self) drawBars(DD.getSoloHistory().slice(-20), (h) => `${h.answered} of ${h.prompts} prompts answered`, false);
+    else el.profRecent.innerHTML = `<p class="feedback">Recent solo dives are only shown on the diver's own device.</p>`;
+
+    const rows = [
+      ["Dives", (x) => DD.fmt(x.runs)],
+      ["Deepest", (x) => (x.best ? DD.fmt(x.best) + " m" : "–")],
+      ["Avg depth per dive", (x) => (x.runs ? DD.fmt(Math.round(x.depth / x.runs)) + " m" : "–")],
+      ["Answers", (x) => DD.fmt(x.answers)],
+      ["Avg points per answer", (x) => avg(x.points, x.answers, 1)],
+      ["Miss rate", (x) => pct(x.misses, x.rounds)],
+      ["Leviathans found", (x) => DD.fmt(x.tiers[5])],
+      ["Rare answers (Octopus+)", (x) => pct(x.tiers[3] + x.tiers[4] + x.tiers[5], x.answers)],
+      ["Avg answer time", (x) => secs(x.timed ? x.ms / x.timed : 0)],
+      ["Fastest answer", (x) => secs(x.fastest)],
+      ["Longest streak", (x) => (x.streak ? DD.fmt(x.streak) : "–")],
+      ["Wrong guesses per prompt", (x) => avg(x.guesses, x.rounds, 1)],
+    ];
+    el.profCompare.innerHTML = `<thead><tr><th scope="col"></th><th scope="col">Dive</th><th scope="col">Endless</th></tr></thead>
+      <tbody>${rows.map(([k, fn]) => `<tr><td>${k}</td><td>${fn(d)}</td><td>${fn(e)}</td></tr>`).join("")}</tbody>`;
   }
 
   function showTip(e) {
@@ -831,6 +938,8 @@
     if (b) openProfile(b.dataset.profile);
   });
   $("#mp-view-profile").addEventListener("click", () => { if (uid) openProfile(uid); });
+  $("#open-stats").addEventListener("click", openSoloStats);
+  document.addEventListener("deepdive:stats", shareSolo);
   $("#prof-back").addEventListener("click", () => closeProfile());
   el.profModes.addEventListener("click", (e) => {
     const b = e.target.closest("[data-pmode]");
