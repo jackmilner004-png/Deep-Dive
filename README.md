@@ -9,6 +9,11 @@ answer, the deeper you sink.
 - Every point is 10 metres of depth; a perfect 7-prompt dive reaches 7,000 m.
 - Guess as many times as you like until the timer runs out. In endless mode you
   play until you run out of air three times.
+- Close misses get a "Did you mean …?" line under the answer box: bad
+  misspellings, sound-alikes, the start of a long answer, or part of one
+  ("lebowski" → The Big Lebowski, "kane" → Harry Kane). Tap it to answer with
+  it, or press Tab to copy it into the box. Nothing is suggested when two
+  answers are equally close.
 - 516 categories and about 25,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
   so prompts don't repeat until you've seen them all (multiplayer rooms draw

@@ -143,6 +143,12 @@ form.answer input::placeholder { color: var(--ink-faint); }
 @keyframes shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
 .feedback { min-height: 1.5em; margin: -14px 0 0; color: var(--ink-soft); }
 .feedback.miss { color: var(--danger); }
+.suggest { margin: -8px 0 0; color: var(--ink-soft); }
+.suggest button {
+  font: 700 1em var(--body); color: var(--lure); background: none; border: 0; padding: 0;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.suggest button:hover, .suggest button:focus-visible { color: var(--ink); }
 
 .reveal { display: grid; gap: 16px; padding: 22px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; }
 .verdict { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 24px; }
@@ -530,6 +536,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         <button class="primary" type="submit">Dive</button>
       </form>
       <p class="feedback" id="feedback" aria-live="assertive"></p>
+      <p class="suggest" id="suggest" aria-live="polite" hidden></p>
       <div class="reveal" id="reveal" hidden aria-live="polite"></div>
       <button type="button" class="next primary" id="next" hidden></button>
       <div><button class="link" type="button" data-menu>Quit to menu</button></div>
@@ -637,6 +644,7 @@ ol.answers .gain { font: 700 15px var(--mono); color: var(--c); text-align: righ
         <button class="primary" type="submit">Dive</button>
       </form>
       <p class="feedback" id="mp-feedback" aria-live="assertive" hidden></p>
+      <p class="suggest" id="mp-suggest" aria-live="polite" hidden></p>
       <div class="waiting" id="mp-waiting" hidden></div>
       <div class="reveal mp-reveal" id="mp-reveal" hidden aria-live="polite"></div>
       <div class="mp-board" id="mp-board"></div>

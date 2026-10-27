@@ -36,6 +36,13 @@
       .replace(/[^a-z0-9+#]/g, "");
   }
 
+  // Lower-case words without accents or filler, for comparing guesses word by word.
+  const FILLER = /^(the|a|an|of|and|in|on|de|la|le)$/;
+  function words(s) {
+    return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/&/g, " and ").split(/[^a-z0-9]+/).filter((w) => w && !FILLER.test(w));
+  }
+
   function titleCase(s) {
     if (/^[a-z]{1,3}[\d+#-]/.test(s) || s.length <= 2) return s.toUpperCase();
     const small = /^(a|an|and|at|by|for|in|of|on|or|the|to|with|de|da|von)$/;
@@ -46,6 +53,7 @@
   const PROMPTS = window.DEEP_DIVE_PROMPTS.map((line, id) => {
     const [prompt, ...tiers] = line.split("|").map((p) => p.trim());
     const lookup = new Map();
+    const forms = [];
     const byTier = tiers.map((group, tier) =>
       group.split(",").map((a) => a.trim()).filter(Boolean).map((answer) => {
         const spellings = answer.split("/").map((x) => x.trim());
@@ -53,11 +61,12 @@
         spellings.forEach((sp) => {
           const key = norm(sp);
           if (key && !lookup.has(key)) lookup.set(key, entry);
+          if (key) forms.push({ key, words: words(sp), entry });
         });
         return entry;
       })
     );
-    return { id, prompt, byTier, lookup };
+    return { id, prompt, byTier, lookup, forms };
   });
 
   function levenshtein(a, b) {
@@ -90,6 +99,94 @@
       else if (d === bestD && entry !== best) tie = true;
     });
     return best && !tie ? best : null;
+  }
+
+  // Edit distance with no length cut-off, for the looser "did you mean" check.
+  // Swapping two neighbouring letters counts as one edit.
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  }
+
+  // Roughly how a word sounds: soft spellings merged, vowels and doubled letters dropped.
+  function sound(k) {
+    return k.replace(/ph/g, "f").replace(/ck|q/g, "k").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k")
+      .replace(/z/g, "s").replace(/x/g, "ks")
+      .replace(/(?!^)[aeiouyhw]/g, "").replace(/(.)\1+/g, "$1");
+  }
+
+  function closeWord(guess, word) {
+    if (guess === word) return true;
+    if (guess.length >= 5 && word.startsWith(guess)) return true;
+    const allowed = guess.length >= 8 ? 2 : guess.length >= 6 ? 1 : 0;
+    return allowed > 0 && word.length >= guess.length && word.length - guess.length <= allowed &&
+      distance(guess, word) <= allowed;
+  }
+
+  // A guess that isn't an answer but is close to one: a bad misspelling, a
+  // sound-alike, the start of a long answer, or some of its words. Returns
+  // that answer, or null when nothing is close or two answers are equally close.
+  function suggest(p, raw) {
+    const key = norm(raw);
+    if (key.length < 3) return null;
+    const guessWords = words(raw).filter((w) => w.length >= 4);
+    const best = new Map();
+    for (const sp of p.forms) {
+      let score = 0;
+      const ratio = key.length >= 4 ? 1 - distance(key, sp.key) / Math.max(key.length, sp.key.length) : 0;
+      if (ratio >= 0.75) score = ratio;
+      if (ratio >= 0.5 && key.length >= 5 && sound(key).length >= 4 && sound(key) === sound(sp.key)) score = Math.max(score, 0.85);
+      if (key.length >= 5 && sp.key.startsWith(key)) score = Math.max(score, 0.7 + 0.25 * key.length / sp.key.length);
+      if (guessWords.length && sp.words.length > 1) {
+        const hit = sp.words.filter((w) => guessWords.some((g) => closeWord(g, w)));
+        if (guessWords.every((g) => sp.words.some((w) => closeWord(g, w)))) {
+          const covered = hit.join("").length / sp.words.join("").length;
+          if (covered >= 0.3) score = Math.max(score, 0.6 + 0.3 * covered);
+        }
+      }
+      if (score > (best.get(sp.entry) || 0)) best.set(sp.entry, score);
+    }
+    const ranked = [...best].sort((a, b) => b[1] - a[1]);
+    if (!ranked.length || ranked[0][1] < 0.6) return null;
+    if (ranked[1] && ranked[0][1] - ranked[1][1] < 0.05) return null;
+    return ranked[0][0];
+  }
+
+  // The "Did you mean ...?" line under an answer box. Tapping it answers with
+  // the suggestion; Tab copies it into the box.
+  function suggester(form, input, box) {
+    let current = null;
+    function clear() { current = null; box.hidden = true; box.innerHTML = ""; }
+    box.addEventListener("click", (e) => {
+      if (!current || !e.target.closest("button")) return;
+      input.value = current.label;
+      clear();
+      form.requestSubmit();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab" || !current || e.shiftKey) return;
+      e.preventDefault();
+      input.value = current.label;
+      clear();
+    });
+    input.addEventListener("input", clear);
+    return {
+      clear,
+      offer(p, raw) {
+        current = suggest(p, raw);
+        if (!current) return clear();
+        box.innerHTML = `Did you mean <button type="button">${escapeHtml(current.label)}</button>?`;
+        box.hidden = false;
+      },
+    };
   }
 
   // ---------- storage (per-browser conveniences) ----------
@@ -152,6 +249,7 @@
     form: $("#answer-form"),
     input: $("#answer"),
     feedback: $("#feedback"),
+    suggest: $("#suggest"),
     reveal: $("#reveal"),
     next: $("#next"),
     stats: $("#stats"),
@@ -267,6 +365,7 @@
     if (hit) return finishPrompt(hit);
     el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
+    hints.offer(game.prompt, raw);
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
     el.form.classList.add("shake");
@@ -278,6 +377,7 @@
     cancelAnimationFrame(rafId);
     el.input.disabled = true;
     el.form.hidden = true;
+    hints.clear();
     el.oxygen.hidden = true;
     el.feedback.textContent = "";
 
@@ -699,6 +799,7 @@
 
   // ---------- wiring ----------
 
+  const hints = suggester(el.form, el.input, el.suggest);
   el.form.addEventListener("submit", submit);
   el.next.addEventListener("click", advance);
   el.copy.addEventListener("click", copyShare);
@@ -717,7 +818,7 @@
   // Shared with multiplayer.js and account.js
   window.DeepDive = {
     PROMPTS, TIERS, SECONDS, DIVE_LENGTH, METRES_PER_POINT,
-    match, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
+    match, suggest, suggester, shuffle, fmt, zoneFor, setDepth, show, descend, descendGroup, drawPrompt, escapeHtml, factHtml, load, save,
     getStats: () => Object.assign({}, stats),
     setStats(next) { Object.assign(stats, next); save("stats", stats); renderStats(); },
   };

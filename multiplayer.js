@@ -54,6 +54,7 @@
     form: $("#mp-answer-form"),
     input: $("#mp-answer"),
     feedback: $("#mp-feedback"),
+    suggest: $("#mp-suggest"),
     waiting: $("#mp-waiting"),
     countdown: $("#mp-countdown"),
     reveal: $("#mp-reveal"),
@@ -341,6 +342,7 @@
       mine.diveId = dive.id;
       el.input.value = "";
       el.feedback.textContent = "";
+      hints.clear();
     }
     if (el.play.hidden) DD.show(el.play);
     const prompt = byText.get(dive.prompts[r]);
@@ -416,6 +418,7 @@
     el.form.hidden = !on.form;
     el.oxygen.hidden = !on.oxygen;
     el.feedback.hidden = !on.form;
+    if (!on.form) hints.clear();
     el.waiting.hidden = !on.waiting;
     el.reveal.hidden = !on.reveal;
   }
@@ -432,6 +435,7 @@
     if (hit) return sendAnswer(hit, raw);
     el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
+    hints.offer(prompt, raw);
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
     el.form.classList.add("shake");
@@ -819,6 +823,7 @@
   $("#open-mp").addEventListener("click", () => openHome());
   el.create.addEventListener("click", createRoom);
   el.joinForm.addEventListener("submit", joinRoom);
+  const hints = DD.suggester(el.form, el.input, el.suggest);
   el.form.addEventListener("submit", submit);
   el.startBtn.addEventListener("click", startDive);
   document.addEventListener("click", (e) => {
