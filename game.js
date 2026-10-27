@@ -39,7 +39,7 @@
   function titleCase(s) {
     if (/^[a-z]{1,3}[\d+#-]/.test(s) || s.length <= 2) return s.toUpperCase();
     const small = /^(a|an|and|at|by|for|in|of|on|or|the|to|with|de|da|von)$/;
-    return s.replace(/(^|[\s(-])([a-z][^\s(-]*)/g, (m, p, w, i) =>
+    return s.replace(/(^|[\s(-])(\p{Ll}[^\s(-]*)/gu, (m, p, w, i) =>
       p + (i > 0 && p === " " && small.test(w) ? w : w[0].toUpperCase() + w.slice(1)));
   }
 
