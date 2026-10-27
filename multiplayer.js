@@ -435,7 +435,7 @@
     if (hit) return sendAnswer(hit, raw);
     el.feedback.textContent = `“${raw}” isn't on our list. Try another.`;
     el.feedback.className = "feedback miss";
-    hints.offer(prompt, raw);
+    if (!isFrenzy(dive)) hints.offer(prompt, raw); // Feeding Frenzy stays strict: no hints
     el.form.classList.remove("shake");
     void el.form.offsetWidth;
     el.form.classList.add("shake");

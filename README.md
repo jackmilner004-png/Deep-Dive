@@ -13,7 +13,7 @@ answer, the deeper you sink.
   misspellings, sound-alikes, the start of a long answer, or part of one
   ("lebowski" → The Big Lebowski, "kane" → Harry Kane). Tap it to answer with
   it, or press Tab to copy it into the box. Nothing is suggested when two
-  answers are equally close.
+  answers are equally close, and Feeding Frenzy never suggests anything.
 - 516 categories and about 25,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
   so prompts don't repeat until you've seen them all (multiplayer rooms draw
