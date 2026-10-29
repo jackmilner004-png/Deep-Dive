@@ -46,8 +46,10 @@
   function titleCase(s) {
     if (/^[a-z]{1,3}[\d+#-]/.test(s) || s.length <= 2) return s.toUpperCase();
     const small = /^(a|an|and|at|by|for|in|of|on|or|the|to|with|de|da|von)$/;
+    const roman = /^(?=[ivx]{2})x{0,3}(ix|iv|v?i{0,3})$/;   // "George VI", "Louis XIV"
     return s.replace(/(^|[\s(-])(\p{Ll}[^\s(-]*)/gu, (m, p, w, i) =>
-      p + (i > 0 && p === " " && small.test(w) ? w : w[0].toUpperCase() + w.slice(1)));
+      p + (roman.test(w) && i > 0 ? w.toUpperCase()
+        : i > 0 && p === " " && small.test(w) ? w : w[0].toUpperCase() + w.slice(1)));
   }
 
   const PROMPTS = window.DEEP_DIVE_PROMPTS.map((line, id) => {
@@ -209,7 +211,11 @@
 
   // A shuffled deck of prompt ids, kept across visits so prompts don't repeat
   // until the whole bank has been seen; then it reshuffles.
-  let deck = load("deck", []).filter((id) => id < PROMPTS.length);
+  // Bump BANK_VERSION when prompts are removed or reordered: saved decks hold prompt
+  // positions, so an old deck would point at the wrong prompts and gets reshuffled.
+  const BANK_VERSION = 2;
+  let deck = load("bankVersion", 1) === BANK_VERSION ? load("deck", []).filter((id) => id < PROMPTS.length) : [];
+  save("bankVersion", BANK_VERSION);
   // Prompts added since this browser last played get mixed into the remaining deck.
   const bankSize = load("bankSize", 88); // 88 = size of the first published bank
   if (deck.length && bankSize < PROMPTS.length) {

@@ -14,7 +14,7 @@ answer, the deeper you sink.
   ("lebowski" → The Big Lebowski, "kane" → Harry Kane). Tap it to answer with
   it, or press Tab to copy it into the box. Nothing is suggested when two
   answers are equally close, and Feeding Frenzy never suggests anything.
-- 516 categories and about 25,000 answers, from broad ("Name a fruit") to
+- 412 categories and about 45,000 answers, from broad ("Name a fruit") to
   specific ("Name a Queen song", "Name a London Underground station"), shuffled
   so prompts don't repeat until you've seen them all (multiplayer rooms draw
   from the host's shuffled order too).
@@ -105,11 +105,11 @@ of the same browser: each tab is a separate player.
 | `firebase-config.js` | Your Firebase web config (empty until multiplayer is set up). |
 | `database.rules.json` | Firebase Realtime Database security rules. |
 | `facts.js` | A short note on each prompt's Leviathan answer, shown after the reveal. Add one when you add a prompt. |
-| `prompts-extra.js` | Fourth batch: 25 categories built from Wikidata lists plus 125 written by hand. |
-| `prompts-r5.js` | Fifth batch: 24 categories checked against Wikidata lists, 7 Pokémon types from PokéAPI, and 58 written by hand. |
+| `prompts-extra.js` | Fourth batch: categories built from Wikidata lists plus ones written by hand. |
+| `prompts-r5.js` | Fifth batch: hand-written categories (songs, TV, sport, places, food, words). |
 | `prompts-more.js` | Third batch of prompts (nature, places, people, entertainment, food, everyday, sport, words), same format. |
 | `prompts-specific.js` | More specific prompts (songs, films, books, sport, places, history), same format as `prompts.js`. |
-| `prompts.js` | The prompt bank. Each line is `Prompt \| plankton \| krill \| seahorse \| octopus \| anglerfish \| leviathan`; answers are comma separated, alternative spellings joined with `/`. |
+| `prompts.js` | The prompt bank. Each line is `Prompt \| plankton \| krill \| seahorse \| octopus \| anglerfish \| leviathan`; answers are comma separated, alternative spellings joined with `/`. New prompts go at the end of the last file; removing or reordering prompts means bumping `BANK_VERSION` in `game.js`. |
 
 ## Local preview
 
